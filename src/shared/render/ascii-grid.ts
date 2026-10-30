@@ -104,6 +104,17 @@ export class AsciiGrid {
     }
   }
 
+  /** Empties every cell painted with `role`. */
+  clearRole(role: ColorRole): void {
+    const r = ROLE_INDEX[role];
+    for (let i = 0; i < this.roles.length; i++) {
+      if (this.roles[i] === r) {
+        this.roles[i] = NONE;
+        this.chars[i] = ' ';
+      }
+    }
+  }
+
   copyFrom(other: AsciiGrid): void {
     if (other.cols !== this.cols || other.rows !== this.rows) throw new Error('grid size mismatch');
     for (let i = 0; i < this.chars.length; i++) this.chars[i] = other.chars[i]!;

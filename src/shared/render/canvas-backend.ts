@@ -85,6 +85,7 @@ export class CanvasBackend {
     ctx.font = `${m.fontPx * m.dpr}px ${MONO_FONT}`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
+    if (!this.opaque) return this.presentOutlined(ctx, grid);
     let indices: number[];
     if (!this.prev || this.prev.cols !== grid.cols || this.prev.rows !== grid.rows) {
       ctx.clearRect(0, 0, this.bg.width, this.bg.height);
@@ -101,6 +102,32 @@ export class CanvasBackend {
     }
     for (const i of indices) this.drawCell(ctx, i % grid.cols, Math.floor(i / grid.cols), grid.chars[i]!, grid.roles[i]!);
     return indices.length;
+  }
+
+  /**
+   * Transparent mode (pet over the desktop): every glyph gets a halo in the background colour so
+   * it reads over any wallpaper. Halos overlap neighbouring cells, so the (sparse) grid is redrawn
+   * in full each frame instead of diffed.
+   */
+  private presentOutlined(ctx: CanvasRenderingContext2D, grid: AsciiGrid): number {
+    const m = this.metrics;
+    ctx.clearRect(0, 0, this.bg.width, this.bg.height);
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(2, m.cellW * 0.4) * m.dpr;
+    ctx.strokeStyle = this.colors[0]!;
+    const cells: number[] = [];
+    for (let i = 0; i < grid.chars.length; i++) if (grid.roles[i]! > 0 && grid.chars[i] !== ' ') cells.push(i);
+    const pos = (i: number): [number, number] => {
+      const x = i % grid.cols, y = Math.floor(i / grid.cols);
+      return [Math.floor(x * m.cellW * m.dpr), Math.floor((y + 0.5) * m.cellH * m.dpr)];
+    };
+    for (const i of cells) ctx.strokeText(grid.chars[i]!, ...pos(i));
+    for (const i of cells) {
+      ctx.fillStyle = this.colors[grid.roles[i]!]!;
+      ctx.fillText(grid.chars[i]!, ...pos(i));
+    }
+    this.prev = null;
+    return cells.length;
   }
 
   private drawCell(ctx: CanvasRenderingContext2D, x: number, y: number, ch: string, role: number): void {

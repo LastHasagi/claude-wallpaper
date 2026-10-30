@@ -115,15 +115,16 @@ describe('SceneController', () => {
     expect(s.compose().get(10, 29)?.ch).not.toBe('[');
   });
 
-  it('overlay props get a background outline', async () => {
+  it('overlay props have no opaque cells (the renderer draws glyph halos instead)', async () => {
     const { s, step } = makeScene('overlay');
-    const p = s.showProp('box', parsePropArt({ frames: [['XX']] }), 10);
+    const p = s.showProp('box', parsePropArt({ frames: [['X  X']] }), 10);
     step(0.6);
     await p;
     const g = s.compose();
     const row = s.layout().groundRow;
-    expect(g.get(9, row)).toEqual({ ch: ' ', role: 'bg' });
     expect(g.get(10, row)?.ch).toBe('X');
+    expect(g.get(11, row)).toEqual({ ch: ' ', role: null });
+    expect(g.get(9, row)).toEqual({ ch: ' ', role: null });
   });
 
   it('birds cross the sky and resolve', async () => {

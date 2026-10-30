@@ -1,10 +1,11 @@
-// Quick screenshot helper: node scripts/shot.mjs "<query>" <out.png> [waitMs] [width] [height]
+// Screenshot sequence: node scripts/shot.mjs "<query>" <outPrefix> [times=1500] [width=1280] [height=720]
+// `times` is a comma list of ms since page load, e.g. "1000,5000,9000" -> <outPrefix>-1000.png …
 // Expects a server on BASE (default http://localhost:5173). Uses the system Edge/Chrome.
 import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-const [query = '', out = 'artifacts/shot.png', wait = '1500', width = '1280', height = '720'] = process.argv.slice(2);
+const [query = '', prefix = 'artifacts/shot', times = '1500', width = '1280', height = '720'] = process.argv.slice(2);
 const base = process.env.BASE ?? 'http://localhost:5173';
 
 async function launch() {
@@ -23,9 +24,17 @@ const page = await browser.newPage({ viewport: { width: Number(width), height: N
 const errors = [];
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 page.on('pageerror', (e) => errors.push(String(e)));
+const start = Date.now();
 await page.goto(`${base}/?${query}`);
-await page.waitForTimeout(Number(wait));
-mkdirSync(dirname(out), { recursive: true });
-await page.screenshot({ path: out });
-console.log(JSON.stringify({ out, errors }));
+mkdirSync(dirname(prefix), { recursive: true });
+const shots = [];
+for (const t of times.split(',').map(Number)) {
+  const left = t - (Date.now() - start);
+  if (left > 0) await page.waitForTimeout(left);
+  const out = `${prefix}-${t}.png`;
+  await page.screenshot({ path: out });
+  shots.push(out);
+}
+const debug = await page.evaluate(() => document.getElementById('debug')?.textContent ?? '');
+console.log(JSON.stringify({ shots, errors, debug }, null, 1));
 await browser.close();

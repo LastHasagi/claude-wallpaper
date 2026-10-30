@@ -32,23 +32,23 @@ export const BENCH = parsePropArt({
 });
 export const BENCH_SEAT_ROW = 2;
 
-/** Desk with a mug; steam rises from the mug at column MUG_COL, above row 0. */
+/** Desk with a mug at the far end (clear of Clawd); steam rises above MUG_COL. */
 export const DESK = parsePropArt({
   frames: [[
-    '                 c[_]   ',
-    ' ______________________ ',
-    '|______________________|',
-    ' ||                  || ',
-    ' ||                  || ',
+    '                        c[_] ',
+    ' ___________________________ ',
+    '|___________________________|',
+    ' ||                       || ',
+    ' ||                       || ',
   ]],
   role: 'strong',
   mask: [[
-    '                 aaaa   ',
-    '                        ',
-    '                        ',
-    '                        ',
-    '                        ',
+    '                        aaaa ',
+    '                             ',
+    '                             ',
+    '                             ',
+    '                             ',
   ]],
   roles: { a: 'accent' },
 });
-export const MUG_COL = 19;
+export const MUG_COL = 26;

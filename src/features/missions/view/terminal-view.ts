@@ -10,9 +10,10 @@ export class TerminalView {
     const cols = Math.max(18, ...term.lines.map((l) => [...l.text].length)) + 2;
     const w = cols * cellW;
     const h = (term.lines.length + 1.2) * cellH;
-    let x = anchor.x + anchor.w * 0.85;
-    if (x + w > cssW - cellW) x = anchor.x - w - anchor.w * 0.1;
-    x = Math.max(cellW, x);
+    // Prefer his left: the mug (and its steam) sits at the right end of the desk.
+    let x = anchor.x - w - anchor.w * 0.1;
+    if (x < cellW) x = anchor.x + anchor.w * 0.85;
+    x = Math.min(Math.max(cellW, x), cssW - w - cellW);
     const y = Math.max(cellH, anchor.y - h * 0.6);
 
     b.fillRect(x, y, w, h, b.color('paper'));

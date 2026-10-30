@@ -50,7 +50,8 @@ export class SceneView {
     }
     for (const p of m.props.values()) this.drawProp(g, p, m.time);
     for (const e of m.effects.values()) this.drawEffect(g, e, m);
-    if (mode === 'overlay') g.outline('bg');
+    // Overlay: no opaque cells at all; the renderer gives each glyph its own halo instead.
+    if (mode === 'overlay') g.clearRole('bg');
     else if (m.label && !m.transition) g.text(2, 1, m.label, 'accent');
     return g;
   }
