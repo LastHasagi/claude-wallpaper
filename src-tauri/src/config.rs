@@ -33,6 +33,42 @@ pub struct Geometry {
     pub h: f64,
 }
 
+/// Parses `--mode <overlay|terrarium|wallpaper>` (or `--mode=<…>`) from command-line arguments.
+pub fn mode_from_args(args: &[String]) -> Option<Mode> {
+    let value = args.iter().enumerate().find_map(|(i, a)| {
+        if a == "--mode" {
+            args.get(i + 1).cloned()
+        } else {
+            a.strip_prefix("--mode=").map(str::to_string)
+        }
+    })?;
+    serde_json::from_value(serde_json::Value::String(value.to_lowercase())).ok()
+}
+
+/// A saved terrarium is reused only if it is a reasonable size and still on screen
+/// (monitors and resolutions change).
+pub fn fits_inside(g: &Geometry, area: &Geometry) -> bool {
+    g.w >= 200.0
+        && g.h >= 150.0
+        && g.w <= area.w * 0.9
+        && g.h <= area.h * 0.9
+        && g.x >= area.x - g.w * 0.5
+        && g.y >= area.y
+        && g.x + g.w * 0.5 <= area.x + area.w
+        && g.y + 40.0 <= area.y + area.h
+}
+
+/// 520×300 in the bottom-right corner of the work area.
+pub fn default_terrarium(area: &Geometry) -> Geometry {
+    let (w, h) = (520.0_f64.min(area.w * 0.8), 300.0_f64.min(area.h * 0.8));
+    Geometry {
+        x: area.x + area.w - w - 24.0,
+        y: area.y + area.h - h - 24.0,
+        w,
+        h,
+    }
+}
+
 /// App-level state owned by the native side. Engine preferences (theme, language…) live in the
 /// webview's storage instead.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -75,7 +111,10 @@ impl AppConfig {
             fs::create_dir_all(dir)?;
         }
         let tmp = path.with_extension("json.tmp");
-        fs::write(&tmp, serde_json::to_string_pretty(self).map_err(io::Error::other)?)?;
+        fs::write(
+            &tmp,
+            serde_json::to_string_pretty(self).map_err(io::Error::other)?,
+        )?;
         fs::rename(tmp, path)
     }
 }
@@ -85,7 +124,9 @@ mod tests {
     use super::*;
 
     fn temp_path(name: &str) -> std::path::PathBuf {
-        std::env::temp_dir().join(format!("clawd-pet-test-{}-{name}", std::process::id())).join("config.json")
+        std::env::temp_dir()
+            .join(format!("clawd-pet-test-{}-{name}", std::process::id()))
+            .join("config.json")
     }
 
     #[test]
@@ -118,7 +159,12 @@ mod tests {
         let c = AppConfig {
             mode: Mode::Wallpaper,
             onboarded: true,
-            terrarium: Some(Geometry { x: 10.0, y: 20.0, w: 520.0, h: 300.0 }),
+            terrarium: Some(Geometry {
+                x: 10.0,
+                y: 20.0,
+                w: 520.0,
+                h: 300.0,
+            }),
             terrarium_on_top: false,
             lang: "pt".into(),
             hidden: true,
@@ -129,8 +175,88 @@ mod tests {
     }
 
     #[test]
+    fn rejects_full_screen_or_off_screen_terrarium_geometry() {
+        let area = Geometry {
+            x: 0.0,
+            y: 0.0,
+            w: 1536.0,
+            h: 864.0,
+        };
+        // The real bug: the overlay's full-screen size saved as the terrarium.
+        assert!(!fits_inside(
+            &Geometry {
+                x: 0.0,
+                y: 0.0,
+                w: 1536.0,
+                h: 864.0
+            },
+            &area
+        ));
+        assert!(!fits_inside(
+            &Geometry {
+                x: 3000.0,
+                y: 100.0,
+                w: 520.0,
+                h: 300.0
+            },
+            &area
+        ));
+        assert!(!fits_inside(
+            &Geometry {
+                x: 100.0,
+                y: 100.0,
+                w: 50.0,
+                h: 40.0
+            },
+            &area
+        ));
+        assert!(fits_inside(
+            &Geometry {
+                x: 900.0,
+                y: 500.0,
+                w: 520.0,
+                h: 300.0
+            },
+            &area
+        ));
+    }
+
+    #[test]
+    fn default_terrarium_sits_in_the_bottom_right_corner() {
+        let area = Geometry {
+            x: 0.0,
+            y: 0.0,
+            w: 1536.0,
+            h: 864.0,
+        };
+        let g = default_terrarium(&area);
+        assert_eq!((g.w, g.h), (520.0, 300.0));
+        assert!(fits_inside(&g, &area));
+        assert_eq!(g.x + g.w + 24.0, area.w);
+    }
+
+    #[test]
+    fn parses_mode_arguments() {
+        let args = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            mode_from_args(&args(&["app", "--mode", "terrarium"])),
+            Some(Mode::Terrarium)
+        );
+        assert_eq!(
+            mode_from_args(&args(&["app", "--mode=Wallpaper"])),
+            Some(Mode::Wallpaper)
+        );
+        assert_eq!(mode_from_args(&args(&["app", "--mode", "nope"])), None);
+        assert_eq!(mode_from_args(&args(&["app", "--autostart"])), None);
+        assert_eq!(mode_from_args(&args(&["app", "--mode"])), None);
+    }
+
+    #[test]
     fn modes_serialize_lowercase() {
-        assert_eq!(serde_json::to_string(&Mode::Overlay).unwrap(), "\"overlay\"");
+        assert_eq!(
+            serde_json::to_string(&Mode::Overlay).unwrap(),
+            "\"overlay\""
+        );
         assert_eq!(Mode::Wallpaper.as_str(), "wallpaper");
     }
 }

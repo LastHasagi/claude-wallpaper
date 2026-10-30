@@ -2,13 +2,13 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "What the pet and settings windows may call",
-  "windows": ["pet", "settings"],
+  "windows": ["pet-*", "settings"],
   "permissions": [
     "core:default",
     "core:window:allow-cursor-position",
     "core:window:allow-set-ignore-cursor-events",
     "core:window:allow-start-dragging",
-    "core:event:allow-emit-to",
+    "core:event:allow-emit",
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled"

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { emitTo } from '@tauri-apps/api/event';
+import { emit } from '@tauri-apps/api/event';
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { EventBus } from '../shared/events';
 import { PALETTES } from '../shared/render/roles';
@@ -65,7 +65,8 @@ function drawMascot(): void {
 function changeSetting(key: RowKey, value: string | number): void {
   const patch = { [key]: value } as Partial<Settings>;
   settings.set(patch);
-  if (inTauri) void emitTo('pet', 'settings-changed', patch).catch(() => {});
+  // Broadcast: the pet window's label changes every time it is recreated.
+  if (inTauri) void emit('settings-changed', patch).catch(() => {});
 }
 
 async function changeMode(mode: NativeMode): Promise<void> {
