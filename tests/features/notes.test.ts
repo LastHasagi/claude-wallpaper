@@ -151,6 +151,28 @@ describe('NotesController', () => {
     expect(w.notes.model.note).not.toBeNull();
   });
 
+  it('announcements show their own title and run their action when clicked', async () => {
+    const w = notesWorld('off'); // announcements ignore the curiosities setting
+    w.clawd.setAutonomy(true); // free time: an announcement waits while a mission runs
+    const opened: string[] = [];
+    w.notes.announce(
+      { id: 'update-9.9.9', topic: 'app', pt: 'Saiu a versão 9.9.9!', en: 'Version 9.9.9 is out!', title: { pt: 'Novidade!', en: 'New!' } },
+      () => opened.push('release page'),
+    );
+    await w.run(30, () => w.notes.model.note?.phase === 'shown');
+    expect(w.notes.model.note?.fact.title?.pt).toBe('Novidade!');
+    const rect = w.notes.interactiveRects()[0]!;
+    w.notes.onCursor({ type: 'down', x: rect.x + 4, y: rect.y + 4, t: 0 });
+    expect(opened).toEqual(['release page']);
+    // A regular curiosity afterwards has no action attached.
+    await w.run(1);
+    void w.notes.deliver('general');
+    await w.run(30, () => w.notes.model.note?.phase === 'shown');
+    const r2 = w.notes.interactiveRects()[0]!;
+    w.notes.onCursor({ type: 'down', x: r2.x + 4, y: r2.y + 4, t: 0 });
+    expect(opened).toEqual(['release page']);
+  });
+
   it('respects the "off" setting', async () => {
     const w = notesWorld('off');
     await w.notes.maybeDeliver('birds');

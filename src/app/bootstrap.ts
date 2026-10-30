@@ -72,11 +72,11 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
 
   function layout(): void {
     const m = backend.resize(win.innerWidth, win.innerHeight, win.devicePixelRatio || 1);
-    const l = scene.resize(m.cols, m.rows, m.cellW, m.cellH, m.cssH, host.groundInset());
+    const l = scene.resize(m.cols, m.rows, m.cellW, m.cellH, m.cssH, host.groundInset(), host.segments?.() ?? []);
     const dev = Math.max(1, Math.round(((m.cellW * SIZE_CELLS[settings.get().size]) / 36) * m.dpr));
     const scale = dev / m.dpr;
     const margin = 18 * scale;
-    clawd.setStage({ minX: margin, maxX: m.cssW - margin, groundY: l.groundY, scale });
+    clawd.setStage({ minX: margin, maxX: m.cssW - margin, groundY: l.groundY, scale, floors: scene.floors() });
   }
 
   applyTheme();

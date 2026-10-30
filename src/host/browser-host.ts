@@ -1,6 +1,7 @@
 import type { Rect } from '../shared/geometry';
 import type { CursorEvent, CursorSource, DisplayMode, HostAdapter } from './host';
 import { LocalStorage } from './local-storage';
+import { parseSegments } from './segments';
 
 /** Simulated taskbar height used when previewing overlay mode in a browser. */
 const FAKE_TASKBAR = 48;
@@ -32,11 +33,18 @@ export class BrowserHost implements HostAdapter {
   interactiveRects: Rect[] = [];
 
   readonly fakeDesktop: boolean;
+  private readonly segmentRects: Rect[];
 
   constructor(params: URLSearchParams, private readonly win: Window = window) {
     this.mode = params.get('mode') === 'overlay' ? 'overlay' : 'full';
     this.fakeDesktop = this.mode === 'overlay' && !params.has('transparent');
     this.cursor = new DomCursor(win);
+    // Simulates several monitors in a browser tab, e.g. ?segments=0,0,640,450;640,90,640,360
+    this.segmentRects = parseSegments(params.get('segments'));
+  }
+
+  segments(): Rect[] {
+    return this.segmentRects;
   }
 
   groundInset(): number {

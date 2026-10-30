@@ -104,6 +104,21 @@ export class AsciiGrid {
     }
   }
 
+  /** Copies every cell of `src` (empty ones included) with its top-left at (x, y). */
+  paste(src: AsciiGrid, x: number, y: number): void {
+    for (let r = 0; r < src.rows; r++) {
+      const ty = y + r;
+      if (ty < 0 || ty >= this.rows) continue;
+      for (let c = 0; c < src.cols; c++) {
+        const tx = x + c;
+        if (tx < 0 || tx >= this.cols) continue;
+        const si = r * src.cols + c, ti = ty * this.cols + tx;
+        this.chars[ti] = src.chars[si]!;
+        this.roles[ti] = src.roles[si]!;
+      }
+    }
+  }
+
   /** Empties every cell painted with `role`. */
   clearRole(role: ColorRole): void {
     const r = ROLE_INDEX[role];

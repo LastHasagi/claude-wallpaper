@@ -38,6 +38,16 @@
       footer small { color: var(--mid); font-size: 11.5px; }
       footer small a { color: var(--accent); text-decoration: none; cursor: pointer; }
       footer small a:hover, footer small a:focus-visible { text-decoration: underline; }
+      #update { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: -6px 0 14px; padding: 8px 12px; border-radius: 8px; background: var(--paper); border: 1px solid var(--accent); }
+      #update span { color: var(--ink); }
+      .small-btn { all: unset; cursor: pointer; background: var(--accent); color: var(--bg); font-weight: 700; padding: 4px 12px; border-radius: 5px; font-size: 12.5px; }
+      #monitors { margin-top: 10px; padding: 10px; border-radius: 8px; border: 1px dashed var(--faint); }
+      #monitors.ask { border: 1px solid var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+      #monitors p { margin: 0 0 8px; color: var(--ink); }
+      #monitors .choices { display: flex; flex-direction: column; gap: 6px; }
+      #monitors .choices button { all: unset; cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--faint); background: var(--paper); color: var(--mid); font-size: 12.5px; }
+      #monitors .choices button[aria-pressed="true"] { border-color: var(--accent); color: var(--ink); }
+      .small-btn:focus-visible, #monitors .choices button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
       [hidden] { display: none !important; }
     </style>
   </head>
@@ -46,8 +56,10 @@
       <canvas id="mascot" width="36" height="22"></canvas>
       <div><h1 id="title"></h1><p id="subtitle"></p></div>
     </header>
+    <div id="update" hidden><span id="update-text"></span><button class="small-btn" id="update-btn"></button></div>
     <h2 id="mode-heading"></h2>
     <div class="modes" id="modes"></div>
+    <div id="monitors" hidden><p id="monitors-q"></p><div class="choices" id="monitor-choices"></div></div>
     <h2 id="prefs-heading"></h2>
     <div id="prefs"></div>
     <footer>

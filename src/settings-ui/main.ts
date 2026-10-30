@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { emit } from '@tauri-apps/api/event';
+import { emit, listen } from '@tauri-apps/api/event';
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { EventBus } from '../shared/events';
 import { PALETTES } from '../shared/render/roles';
@@ -13,8 +13,24 @@ interface AppConfig {
   mode: NativeMode;
   onboarded: boolean;
   terrariumOnTop: boolean;
+  /** Monitor name, "all", or null while the user hasn't chosen. */
+  wallpaperMonitor: string | null;
+  checkUpdates: boolean;
 }
 
+interface MonitorInfo {
+  id: string;
+  width: number;
+  height: number;
+  primary: boolean;
+}
+
+interface UpdateInfo {
+  version: string;
+  url: string;
+}
+
+const ALL_MONITORS = 'all';
 const inTauri = '__TAURI_INTERNALS__' in window;
 const params = new URLSearchParams(location.search);
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -25,12 +41,69 @@ const settings = new SettingsController(new LocalStorage(), bus, {
   prefersDark: matchMedia('(prefers-color-scheme: dark)').matches,
 });
 
-// In a plain browser (development preview) the native calls are skipped.
+// In a plain browser (development preview) the native calls are skipped; URL params simulate them:
+// ?welcome  ?monitors=2  ?update=0.3.0  ?ask=monitor
 const config: AppConfig = inTauri
   ? await invoke<AppConfig>('get_config')
-  : { mode: 'overlay', onboarded: !params.has('welcome'), terrariumOnTop: true };
+  : { mode: params.has('monitors') ? 'wallpaper' : 'overlay', onboarded: !params.has('welcome'), terrariumOnTop: true, wallpaperMonitor: null, checkUpdates: true };
 let chosenMode: NativeMode = config.mode;
 let autostart = inTauri ? await isEnabled().catch(() => false) : false;
+const monitors: MonitorInfo[] = inTauri
+  ? await invoke<MonitorInfo[]>('list_monitors').catch(() => [])
+  : Array.from({ length: Number(params.get('monitors') ?? 1) }, (_, i) => ({ id: `DISPLAY${i + 1}`, width: i ? 2560 : 1920, height: i ? 1440 : 1080, primary: i === 0 }));
+let update: UpdateInfo | null = inTauri
+  ? await invoke<UpdateInfo | null>('get_update').catch(() => null)
+  : params.has('update') ? { version: params.get('update')!, url: '' } : null;
+let askMonitor = params.get('ask') === 'monitor';
+
+if (inTauri) {
+  void listen<UpdateInfo>('update-available', (e) => {
+    update = e.payload;
+    render();
+  });
+  void listen('ask-monitor', () => {
+    askMonitor = true;
+    chosenMode = config.mode = 'wallpaper';
+    render();
+    $('monitors').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+}
+
+async function chooseMonitor(target: string): Promise<void> {
+  config.wallpaperMonitor = target;
+  askMonitor = false;
+  if (inTauri && config.onboarded) await invoke('set_wallpaper_monitor', { target }).catch(console.error);
+  render();
+}
+
+function renderMonitors(s: (typeof STRINGS)['pt']): void {
+  const box = $('monitors');
+  box.hidden = !(chosenMode === 'wallpaper' && monitors.length > 1);
+  if (box.hidden) return;
+  box.classList.toggle('ask', askMonitor || config.wallpaperMonitor === null);
+  $('monitors-q').textContent = s.monitorQuestion;
+  const options = [
+    ...monitors.map((m, i) => ({ id: m.id, label: s.monitorName(i + 1, m.primary, m.width, m.height) })),
+    { id: ALL_MONITORS, label: s.monitorAll },
+  ];
+  const current = config.wallpaperMonitor ?? monitors.find((m) => m.primary)?.id;
+  $('monitor-choices').replaceChildren(
+    ...options.map((o) => {
+      const b = document.createElement('button');
+      b.textContent = o.label;
+      b.setAttribute('aria-pressed', String(o.id === current && config.wallpaperMonitor !== null));
+      b.addEventListener('click', () => void chooseMonitor(o.id));
+      return b;
+    }),
+  );
+}
+
+function renderUpdate(s: (typeof STRINGS)['pt']): void {
+  $('update').hidden = !update;
+  if (!update) return;
+  $('update-text').textContent = s.updateAvailable(update.version);
+  $('update-btn').textContent = s.download;
+}
 
 type RowKey = Exclude<keyof Settings, never>;
 const ROWS: { key: RowKey; options: readonly (string | number)[] }[] = [
@@ -178,15 +251,31 @@ function render(): void {
       config.terrariumOnTop = on;
       if (inTauri) void invoke('set_terrarium_on_top', { on }).catch(console.error);
     }),
+    toggleRow(s.rows.updates, config.checkUpdates, (on) => {
+      config.checkUpdates = on;
+      if (!on) update = null;
+      if (inTauri) void invoke('set_check_updates', { on }).catch(console.error);
+      renderUpdate(s);
+    }),
   );
+  renderMonitors(s);
+  renderUpdate(s);
 }
 
-$('start').addEventListener('click', () => {
-  if (inTauri) void invoke('finish_onboarding', { mode: chosenMode }).catch(console.error);
-  else {
+$('start').addEventListener('click', async () => {
+  if (!inTauri) {
     config.onboarded = true;
     render();
+    return;
   }
+  // The monitor choice goes first so the wallpaper opens on the right screens.
+  if (chosenMode === 'wallpaper' && config.wallpaperMonitor) {
+    await invoke('set_wallpaper_monitor', { target: config.wallpaperMonitor }).catch(console.error);
+  }
+  await invoke('finish_onboarding', { mode: chosenMode }).catch(console.error);
+});
+$('update-btn').addEventListener('click', () => {
+  if (inTauri) void invoke('open_update_page').catch(console.error);
 });
 bus.on('settings:changed', render);
 drawMascot();

@@ -6,6 +6,7 @@ import type { Lang } from '../shared/i18n';
 import type { CursorEvent, CursorSource, DisplayMode, HostAdapter } from './host';
 import { LocalStorage } from './local-storage';
 import { insideViewport, shouldCapture, toLocal } from './pointer';
+import { parseSegments } from './segments';
 
 export type NativeMode = 'overlay' | 'terrarium' | 'wallpaper';
 
@@ -26,9 +27,13 @@ export class TauriHost implements HostAdapter {
   private lastLocal: Point | null = null;
   private lang: Lang | null = null;
 
+  private readonly segmentRects: Rect[];
+
   constructor(params: URLSearchParams, private readonly win: Window = window) {
     const m = params.get('mode');
     this.nativeMode = m === 'terrarium' || m === 'wallpaper' ? m : 'overlay';
+    // The native side passes the covered monitors in physical px relative to the window.
+    this.segmentRects = parseSegments(params.get('segments'), win.devicePixelRatio || 1);
     this.mode = this.nativeMode === 'overlay' ? 'overlay' : 'full';
     this.cursor = { subscribe: (fn) => this.subscribe(fn) };
     if (this.nativeMode === 'terrarium') this.addTerrariumChrome();
@@ -36,6 +41,10 @@ export class TauriHost implements HostAdapter {
 
   groundInset(): number {
     return 0; // the native window already ends above the taskbar
+  }
+
+  segments(): Rect[] {
+    return this.segmentRects;
   }
 
   setInteractiveRects(rects: Rect[]): void {

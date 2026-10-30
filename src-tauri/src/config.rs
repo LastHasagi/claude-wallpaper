@@ -33,6 +33,40 @@ pub struct Geometry {
     pub h: f64,
 }
 
+/// A monitor (or a group of them) in physical pixels.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PxRect {
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+}
+
+/// Bounding box of several monitors (the wallpaper window covers it).
+pub fn span(rects: &[PxRect]) -> Option<PxRect> {
+    let x0 = rects.iter().map(|r| r.x).min()?;
+    let y0 = rects.iter().map(|r| r.y).min()?;
+    let x1 = rects.iter().map(|r| r.x + r.w).max()?;
+    let y1 = rects.iter().map(|r| r.y + r.h).max()?;
+    Some(PxRect {
+        x: x0,
+        y: y0,
+        w: x1 - x0,
+        h: y1 - y0,
+    })
+}
+
+/// `segments` URL parameter for the engine: each monitor relative to the span, "x,y,w,h;…".
+pub fn segments_param(rects: &[PxRect], span: &PxRect) -> String {
+    let mut sorted = rects.to_vec();
+    sorted.sort_by_key(|r| (r.x, r.y));
+    sorted
+        .iter()
+        .map(|r| format!("{},{},{},{}", r.x - span.x, r.y - span.y, r.w, r.h))
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
 /// Parses `--mode <overlay|terrarium|wallpaper>` (or `--mode=<…>`) from command-line arguments.
 pub fn mode_from_args(args: &[String]) -> Option<Mode> {
     let value = args.iter().enumerate().find_map(|(i, a)| {
@@ -81,7 +115,13 @@ pub struct AppConfig {
     /// Language for native labels (tray menu), mirrored from the engine.
     pub lang: String,
     pub hidden: bool,
+    /// Wallpaper target: a monitor name, "all", or None while the user hasn't been asked yet.
+    pub wallpaper_monitor: Option<String>,
+    /// Look for new releases on GitHub.
+    pub check_updates: bool,
 }
+
+pub const ALL_MONITORS: &str = "all";
 
 impl Default for AppConfig {
     fn default() -> Self {
@@ -92,6 +132,8 @@ impl Default for AppConfig {
             terrarium_on_top: true,
             lang: "en".into(),
             hidden: false,
+            wallpaper_monitor: None,
+            check_updates: true,
         }
     }
 }
@@ -168,6 +210,8 @@ mod tests {
             terrarium_on_top: false,
             lang: "pt".into(),
             hidden: true,
+            wallpaper_monitor: Some(ALL_MONITORS.into()),
+            check_updates: false,
         };
         c.save(&p).unwrap();
         assert_eq!(AppConfig::load(&p), c);
@@ -233,6 +277,49 @@ mod tests {
         assert_eq!((g.w, g.h), (520.0, 300.0));
         assert!(fits_inside(&g, &area));
         assert_eq!(g.x + g.w + 24.0, area.w);
+    }
+
+    #[test]
+    fn spans_monitors_and_describes_each_relative_to_the_span() {
+        // A 1280×720 monitor to the LEFT of a 1920×1080 primary, bottoms aligned.
+        let primary = PxRect {
+            x: 0,
+            y: 0,
+            w: 1920,
+            h: 1080,
+        };
+        let left = PxRect {
+            x: -1280,
+            y: 360,
+            w: 1280,
+            h: 720,
+        };
+        let s = span(&[primary, left]).unwrap();
+        assert_eq!(
+            s,
+            PxRect {
+                x: -1280,
+                y: 0,
+                w: 3200,
+                h: 1080
+            }
+        );
+        assert_eq!(
+            segments_param(&[primary, left], &s),
+            "0,360,1280,720;1280,0,1920,1080"
+        );
+        assert_eq!(span(&[]), None);
+        assert_eq!(span(&[primary]), Some(primary));
+    }
+
+    #[test]
+    fn old_configs_without_new_fields_still_load() {
+        let p = temp_path("old");
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(&p, r#"{ "mode": "wallpaper", "onboarded": true }"#).unwrap();
+        let c = AppConfig::load(&p);
+        assert_eq!(c.wallpaper_monitor, None);
+        assert!(c.check_updates);
     }
 
     #[test]

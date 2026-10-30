@@ -46,7 +46,7 @@ Na primeira execução aparece a tela de boas-vindas para escolher o modo. Depoi
 |---|---|
 | **Pet solto** | Janela transparente do tamanho da área de trabalho, sempre por cima. Os cliques atravessam, exceto sobre o Clawd e o bilhete (o cursor é consultado ~30 vezes por segundo). |
 | **Terrário** | Janela pequena sem bordas. Arraste pela faixa do topo, onde fica a ⚙ para as configurações. Posição e tamanho são salvos. |
-| **Papel de parede** | **Windows:** anexada atrás dos ícones (técnica WorkerW, compatível com o layout do Windows 11 24H2+). **macOS/Linux:** tela cheia "sempre por baixo" (alternativa, ainda não testada nesses sistemas). |
+| **Papel de parede** | **Windows:** anexada atrás dos ícones (técnica WorkerW, compatível com o layout do Windows 11 24H2+). Com mais de um monitor, o app pergunta onde aplicar: em um monitor ou em **todos**. Em todos, cada monitor tem o próprio cenário e o próprio chão, e o Clawd passeia de um para o outro. **macOS/Linux:** tela cheia "sempre por baixo" (alternativa, ainda não testada nesses sistemas). |
 
 Linha de comando: `clawd-pet --mode overlay|terrarium|wallpaper`. Com o app já aberto, isso só troca o modo da instância em execução.
 
@@ -61,7 +61,9 @@ Releases são automáticas (`.github/workflows/release.yml`):
 
 O GitHub Actions roda os testes, confere se a tag bate com a versão do app, compila Windows, macOS (universal) e Linux e publica a release com os instaladores. Em todo push e pull request, o `ci.yml` roda o typecheck e os testes.
 
-**Limitações conhecidas:** só o monitor principal; no modo papel de parede o Clawd não recebe cliques (quem recebe é a área de trabalho), mas os olhos seguem o cursor e ele acena; com a barra de tarefas em ocultar automaticamente, o pet solto anda rente à borda inferior.
+**Atualizações:** o app consulta as Releases do GitHub ao abrir e a cada 6 horas. Quando sai uma versão nova, aparece um item na bandeja, um banner nas configurações e o Clawd traz um bilhete avisando. Dá para desligar em Configurações → "Avisar sobre novas versões". Nenhum outro dado é enviado.
+
+**Limitações conhecidas:** o pet solto e o terrário usam o monitor principal; no modo papel de parede o Clawd não recebe cliques (quem recebe é a área de trabalho), mas os olhos seguem o cursor e ele acena; com a barra de tarefas em ocultar automaticamente, o pet solto anda rente à borda inferior.
 
 ## Arquitetura
 

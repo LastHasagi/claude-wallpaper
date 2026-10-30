@@ -22,10 +22,10 @@ export class NoteView {
     if (open < 0.95) return;
 
     const left = x + cellW * 2;
-    b.text(TITLE[lang], left, y + cellH * 0.9, b.color('accent'), fontPx, true);
+    b.text(n.fact.title?.[lang] ?? TITLE[lang], left, y + cellH * 0.9, b.color('accent'), fontPx, true);
     lines.forEach((line, i) => b.text(line, left, y + cellH * (2.3 + i), b.color('ink')));
     const sign = '— Clawd';
     b.text(sign, x + w - cellW * (sign.length + 2), y + cellH * (lines.length + 2.7), b.color('mid'));
-    b.text(HINT[lang], left, y + cellH * (lines.length + 3.7), b.color('dim'), fontPx * 0.8);
+    b.text(n.fact.cta?.[lang] ?? HINT[lang], left, y + cellH * (lines.length + 3.7), b.color('dim'), fontPx * 0.8);
   }
 }

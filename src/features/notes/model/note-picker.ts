@@ -7,6 +7,10 @@ export interface Fact {
   topic: string;
   pt: string;
   en: string;
+  /** Custom card title (default "Você sabia?"), e.g. for app announcements. */
+  title?: { pt: string; en: string };
+  /** Custom hint under the text (default "clique para fechar"). */
+  cta?: { pt: string; en: string };
 }
 
 export const SEEN_KEY = 'clawd.notes.seen';

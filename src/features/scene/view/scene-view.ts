@@ -4,6 +4,7 @@ import type { TimeOfDay } from '../../../shared/time';
 import type { DisplayMode } from '../../../host/host';
 import { BIOMES, type BiomeCtx } from '../biomes';
 import { PROP_FADE_TIME, type BiomeKey, type EffectState, type PropState, type SceneModel } from '../model/scene-model';
+import type { Panel } from '../model/panels';
 
 const SCRAMBLE = '01#$%&*+=?<>/\\';
 const SWEEP = 10;
@@ -12,28 +13,48 @@ const BIRD_FORMATION: [dx: number, dy: number][] = [[0, 0], [-3, -1], [-3, 1], [
 export interface SceneGeometry {
   cols: number;
   rows: number;
-  groundRow: number;
+  /** One per monitor; a single screen is one panel covering the whole grid. */
+  panels: Panel[];
+}
+
+/** Biome context of one panel: coordinates relative to the panel, seed varied per panel. */
+export function panelCtx(key: BiomeKey, panel: Panel, index: number, tod: TimeOfDay): BiomeCtx {
+  return { cols: panel.cols, rows: panel.rows, groundRow: panel.groundRow - panel.row0, tod, seed: key.seed + index * 7919 };
 }
 
 /** Composes the ASCII grid for a frame: backdrop (cached) + animation + props + effects + label. */
 export class SceneView {
   private cache = new Map<string, AsciiGrid>();
   private work = new AsciiGrid(1, 1);
+  private panelWork: AsciiGrid[] = [];
 
-  private ctxFor(key: BiomeKey, geo: SceneGeometry, tod: TimeOfDay): BiomeCtx {
-    return { cols: geo.cols, rows: geo.rows, groundRow: geo.groundRow, tod, seed: key.seed };
+  private panelBackdrop(key: BiomeKey, panel: Panel, index: number, tod: TimeOfDay): AsciiGrid {
+    const id = `p|${key.biome}|${key.seed}|${index}|${panel.cols}x${panel.rows}|${panel.groundRow - panel.row0}|${tod}`;
+    let g = this.cache.get(id);
+    if (!g) {
+      g = new AsciiGrid(panel.cols, panel.rows);
+      BIOMES[key.biome].paint(g, panelCtx(key, panel, index, tod));
+      this.remember(id, g);
+    }
+    return g;
   }
 
+  /** Static backdrop of every panel, pasted into one full-size grid. */
   backdrop(key: BiomeKey, geo: SceneGeometry, tod: TimeOfDay): AsciiGrid {
-    const id = `${key.biome}|${key.seed}|${geo.cols}x${geo.rows}|${geo.groundRow}|${tod}`;
+    const sig = geo.panels.map((p) => `${p.col0},${p.row0},${p.cols},${p.rows},${p.groundRow}`).join(';');
+    const id = `all|${key.biome}|${key.seed}|${geo.cols}x${geo.rows}|${sig}|${tod}`;
     let g = this.cache.get(id);
     if (!g) {
       g = new AsciiGrid(geo.cols, geo.rows);
-      BIOMES[key.biome].paint(g, this.ctxFor(key, geo, tod));
-      if (this.cache.size >= 6) this.cache.delete(this.cache.keys().next().value!);
-      this.cache.set(id, g);
+      geo.panels.forEach((p, i) => g!.paste(this.panelBackdrop(key, p, i, tod), p.col0, p.row0));
+      this.remember(id, g);
     }
     return g;
+  }
+
+  private remember(id: string, g: AsciiGrid): void {
+    if (this.cache.size >= 12) this.cache.delete(this.cache.keys().next().value!);
+    this.cache.set(id, g);
   }
 
   compose(m: SceneModel, geo: SceneGeometry, tod: TimeOfDay, mode: DisplayMode): AsciiGrid {
@@ -43,7 +64,13 @@ export class SceneView {
       if (m.transition) this.sweep(g, m, geo, tod);
       else {
         g.copyFrom(this.backdrop(m.current, geo, tod));
-        BIOMES[m.current.biome].animate(g, this.ctxFor(m.current, geo, tod), m.time);
+        geo.panels.forEach((p, i) => {
+          let sub = this.panelWork[i];
+          if (!sub || sub.cols !== p.cols || sub.rows !== p.rows) sub = this.panelWork[i] = new AsciiGrid(p.cols, p.rows);
+          sub.copyFrom(this.panelBackdrop(m.current, p, i, tod));
+          BIOMES[m.current.biome].animate(sub, panelCtx(m.current, p, i, tod), m.time);
+          g.paste(sub, p.col0, p.row0);
+        });
       }
     } else {
       g.clear();
@@ -52,7 +79,10 @@ export class SceneView {
     for (const e of m.effects.values()) this.drawEffect(g, e, m);
     // Overlay: no opaque cells at all; the renderer gives each glyph its own halo instead.
     if (mode === 'overlay') g.clearRole('bg');
-    else if (m.label && !m.transition) g.text(2, 1, m.label, 'accent');
+    else if (m.label && !m.transition) {
+      const focus = geo.panels[m.current.focus ?? 0] ?? geo.panels[0]!;
+      g.text(focus.col0 + 2, focus.row0 + 1, m.label, 'accent');
+    }
     return g;
   }
 

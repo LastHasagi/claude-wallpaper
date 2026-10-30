@@ -138,10 +138,12 @@ export class Director {
       timeOfDay: () => scene.timeOfDay(),
       setPropFrame: (id, f) => scene.setPropFrame(id, f),
       propTopRow: (id) => scene.propTopRow(id),
+      propSurface: (id, row) => scene.propSurface(id, row),
       startEffect: (id, k, c, r) => scene.startEffect(id, k, c, r),
       stopEffect: (id) => scene.stopEffect(id),
       setLabel: (t) => scene.setLabel(t),
       spot: (n) => scene.spot(n),
+      panelAt: (x) => scene.panelAt(x),
       layout: () => scene.layout(),
       colToX: (c) => scene.colToX(c),
       xToCol: (x) => scene.xToCol(x),
@@ -159,10 +161,9 @@ export class Director {
       signal,
       wait: (s) => this.wait(s, signal),
       surface: (propId, artRow) => {
-        const l = scene.layout();
-        const top = scene.propTopRow(propId);
-        if (top === null) throw new Error(`surface(): prop "${propId}" is not shown`);
-        return l.groundY - (top + artRow + 1) * l.cellH;
+        const s = scene.propSurface(propId, artRow);
+        if (s === null) throw new Error(`surface(): prop "${propId}" is not shown`);
+        return s;
       },
     };
   }

@@ -6,7 +6,7 @@ import type { CursorEvent, DisplayMode } from '../../../host/host';
 import { isAbort, type ClawdApi } from '../../clawd/index';
 import type { SceneApi } from '../../scene/index';
 import { cardLayout, NoteModel, type CardMetrics } from '../model/note-model';
-import type { NotePicker } from '../model/note-picker';
+import type { Fact, NotePicker } from '../model/note-picker';
 
 export type NotesSetting = 'off' | 'sometimes' | 'always';
 
@@ -30,6 +30,8 @@ export interface NotesDeps {
 /** Clawd brings a curiosity on a notepad, sticks it on screen and fetches it back when clicked. */
 export class NotesController {
   readonly model = new NoteModel();
+  /** What clicking the current note does besides folding it (announcements). */
+  private action: (() => void) | null = null;
 
   constructor(private readonly d: NotesDeps) {}
 
@@ -53,15 +55,36 @@ export class NotesController {
   }
 
   async deliver(topic: string, signal?: AbortSignal): Promise<void> {
-    const { clawd, scene, picker, rng, bus } = this.d;
-    const fact = picker.pick(topic);
+    await this.deliverFact(this.d.picker.pick(topic), signal);
+  }
+
+  /**
+   * Brings a specific note (e.g. an app announcement) as soon as Clawd is free. Clicking it runs
+   * `action` instead of just folding it away.
+   */
+  announce(fact: Fact, action?: () => void, retryMs = 30_000): void {
+    const attempt = () => {
+      if (this.d.clawd.busy()) {
+        setTimeout(attempt, retryMs);
+        return;
+      }
+      this.deliverFact(fact, undefined, action).catch((err) => {
+        if (!isAbort(err)) console.error('[notes] announcement failed', err);
+      });
+    };
+    attempt();
+  }
+
+  async deliverFact(fact: Fact, signal?: AbortSignal, action?: () => void): Promise<void> {
+    const { clawd, scene, rng, bus } = this.d;
     const l = scene.layout();
-    const width = l.cols * l.cellW;
+    // Stay on the monitor he is on: a few bodies away, comfortably inside it.
+    const p = scene.panelAt(clawd.x());
+    const width = p.x1 - p.x0;
     const bw = clawd.bodyWidth();
-    // Somewhere comfortably on screen, a few bodies away from where he stands now.
-    let target = rng.range(width * 0.25, width * 0.75);
-    if (Math.abs(target - clawd.x()) < bw * 2) target = clawd.x() < width / 2 ? target + bw * 3 : target - bw * 3;
-    target = Math.min(Math.max(target, bw * 2), width - bw * 2);
+    let target = p.x0 + rng.range(width * 0.25, width * 0.75);
+    if (Math.abs(target - clawd.x()) < bw * 2) target = clawd.x() < p.x0 + width / 2 ? target + bw * 3 : target - bw * 3;
+    target = Math.min(Math.max(target, p.x0 + bw * 2), p.x1 - bw * 2);
 
     if (this.model.note) this.model.fold();
     clawd.hold('notepad');
@@ -72,13 +95,14 @@ export class NotesController {
     } finally {
       clawd.hold(null);
     }
-    let y = Math.max(l.cellH * 3, l.groundY * 0.18);
+    let y = p.top + Math.max(l.cellH * 3, (p.groundY - p.top) * 0.18);
     if (this.d.mode === 'overlay') {
       // Overlay: the card floats right above his head (its bottom edge, not its top).
       const card = cardLayout({ fact, x: target, y: 0, phase: 'shown', t: 0 }, this.d.lang(), this.d.metrics());
       y = Math.max(l.cellH, clawd.bounds().y - card.h - bw * 0.25);
     }
     this.model.show(fact, target, y);
+    this.action = action ?? null;
     clawd.emote('♪', 1.4);
     bus.emit('note:shown', { id: fact.id });
   }
@@ -98,6 +122,9 @@ export class NotesController {
     const { clawd, bus } = this.d;
     bus.emit('note:dismissed', { id: n.fact.id });
     this.model.fold();
+    const action = this.action;
+    this.action = null;
+    action?.();
     if (clawd.busy()) {
       clawd.emote('♥', 1.5);
       return;

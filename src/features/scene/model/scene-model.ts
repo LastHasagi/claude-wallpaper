@@ -4,6 +4,8 @@ import type { BiomeId } from '../biomes';
 export interface BiomeKey {
   biome: BiomeId;
   seed: number;
+  /** Index of the panel (monitor) where missions take place. */
+  focus?: number;
 }
 
 export interface Transition {

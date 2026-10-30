@@ -35,6 +35,11 @@ export interface HostAdapter {
   setInteractiveRects(rects: Rect[]): void;
   systemLanguage(): string;
   systemPrefersDark(): boolean;
+  /**
+   * Monitors covered by the engine window, in CSS px relative to it. Absent (or one rect) means a
+   * single screen; several rects get one scene panel each, with its own ground line.
+   */
+  segments?(): Rect[];
   /** Settings changed elsewhere (e.g. the app's settings window); the engine applies the patch. */
   onExternalSettings?(cb: (patch: Record<string, unknown>) => void): void;
   /** The engine's resolved language, so native UI (tray menu) can follow it. */

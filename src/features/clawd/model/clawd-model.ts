@@ -8,13 +8,23 @@ export interface Emote {
   ttl: number;
 }
 
+/** A stretch of ground: one per monitor when the scene spans several. */
+export interface Floor {
+  x0: number;
+  x1: number;
+  groundY: number;
+}
+
 /** Where Clawd lives on screen; set by the controller from the viewport. */
 export interface Stage {
   minX: number;
   maxX: number;
+  /** Ground used where no floor applies (and the only one on a single screen). */
   groundY: number;
   /** CSS px per sprite pixel. */
   scale: number;
+  /** Per-monitor ground lines; walking across a seam lands him on the next monitor's floor. */
+  floors?: Floor[];
 }
 
 const BLINK_TIME = 0.12;
@@ -74,7 +84,24 @@ export class ClawdModel {
 
   /** Screen y of the soles of his feet, CSS px. */
   feetY(): number {
-    return this.stage.groundY - this.elevation - this.jumpY;
+    return this.groundAt(this.x) - this.elevation - this.jumpY;
+  }
+
+  /** Ground line under `x`: the floor containing it, else the nearest one, else the stage ground. */
+  groundAt(x: number): number {
+    const floors = this.stage.floors;
+    if (!floors?.length) return this.stage.groundY;
+    let best = floors[0]!;
+    let bestDist = Infinity;
+    for (const f of floors) {
+      if (x >= f.x0 && x < f.x1) return f.groundY;
+      const d = x < f.x0 ? f.x0 - x : x - f.x1;
+      if (d < bestDist) {
+        bestDist = d;
+        best = f;
+      }
+    }
+    return best.groundY;
   }
 
   center(): Point {

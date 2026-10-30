@@ -2,20 +2,19 @@ mod config;
 #[cfg(windows)]
 mod desktop;
 
-use config::{AppConfig, Geometry, Mode};
+use config::{AppConfig, Geometry, Mode, PxRect};
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
-        Arc, Mutex,
+        atomic::{AtomicU32, Ordering},
+        Mutex,
     },
-    time::Duration,
 };
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
-    Wry,
+    AppHandle, Emitter, Manager, RunEvent, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    WindowEvent, Wry,
 };
 
 const SETTINGS: &str = "settings";
@@ -26,10 +25,32 @@ struct AppState {
     path: PathBuf,
     /// Label of the current pet window. Each recreation gets a fresh label ("pet-N"): a destroyed
     /// window keeps its label registered for a moment, so reusing it races.
-    pet_label: Mutex<Option<(String, Mode)>>,
+    pet_label: Mutex<Option<(String, String)>>,
     pet_seq: AtomicU32,
     /// Serialises pet window (re)creation when mode switches arrive back to back.
     pet_lock: Mutex<()>,
+    /// Newer release found by the update check (the pet window runs it).
+    update: Mutex<Option<UpdateInfo>>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct UpdateInfo {
+    version: String,
+    url: String,
+}
+
+/// Only release pages of this project may be opened from update notices.
+const RELEASES_URL: &str = "https://github.com/LastHasagi/claude-wallpaper/releases";
+
+#[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MonitorInfo {
+    id: String,
+    width: u32,
+    height: u32,
+    x: i32,
+    y: i32,
+    primary: bool,
 }
 
 impl AppState {
@@ -52,6 +73,17 @@ impl AppState {
 
 fn state(app: &AppHandle) -> tauri::State<'_, AppState> {
     app.state::<AppState>()
+}
+
+/// What the current pet window was built for; a different signature means "rebuild".
+fn pet_signature(cfg: &AppConfig) -> String {
+    match cfg.mode {
+        Mode::Wallpaper => format!(
+            "wallpaper|{}",
+            cfg.wallpaper_monitor.as_deref().unwrap_or("primary")
+        ),
+        m => m.as_str().to_string(),
+    }
 }
 
 fn current_pet(app: &AppHandle) -> Option<WebviewWindow> {
@@ -101,19 +133,27 @@ fn build_menu(app: &AppHandle, cfg: &AppConfig) -> tauri::Result<Menu<Wry>> {
     let mode_item = |id: &str, text: &str, mode: Mode| {
         CheckMenuItem::with_id(app, id, text, true, cfg.mode == mode, None::<&str>)
     };
-    Menu::with_items(
-        app,
-        &[
-            &MenuItem::with_id(app, "toggle", l.toggle, true, None::<&str>)?,
-            &PredefinedMenuItem::separator(app)?,
-            &mode_item("mode-overlay", l.overlay, Mode::Overlay)?,
-            &mode_item("mode-terrarium", l.terrarium, Mode::Terrarium)?,
-            &mode_item("mode-wallpaper", l.wallpaper, Mode::Wallpaper)?,
-            &PredefinedMenuItem::separator(app)?,
-            &MenuItem::with_id(app, "settings", l.settings, true, None::<&str>)?,
-            &MenuItem::with_id(app, "quit", l.quit, true, None::<&str>)?,
-        ],
-    )
+    let menu = Menu::new(app)?;
+    if let Some(u) = state(app).update.lock().expect("update lock").clone() {
+        let text = if cfg.lang == "pt" {
+            format!("⬆ Nova versão {} disponível: baixar", u.version)
+        } else {
+            format!("⬆ Version {} is available: download", u.version)
+        };
+        menu.append(&MenuItem::with_id(app, "update", text, true, None::<&str>)?)?;
+        menu.append(&PredefinedMenuItem::separator(app)?)?;
+    }
+    menu.append_items(&[
+        &MenuItem::with_id(app, "toggle", l.toggle, true, None::<&str>)?,
+        &PredefinedMenuItem::separator(app)?,
+        &mode_item("mode-overlay", l.overlay, Mode::Overlay)?,
+        &mode_item("mode-terrarium", l.terrarium, Mode::Terrarium)?,
+        &mode_item("mode-wallpaper", l.wallpaper, Mode::Wallpaper)?,
+        &PredefinedMenuItem::separator(app)?,
+        &MenuItem::with_id(app, "settings", l.settings, true, None::<&str>)?,
+        &MenuItem::with_id(app, "quit", l.quit, true, None::<&str>)?,
+    ])?;
+    Ok(menu)
 }
 
 fn refresh_tray(app: &AppHandle) {
@@ -123,21 +163,44 @@ fn refresh_tray(app: &AppHandle) {
     }
 }
 
-/// Runs `f` (which creates a webview from this background thread) while nudging the main event
-/// loop every 30 ms. Without wakeups an idle loop can leave WebView2's creation callback pending
-/// for many seconds (observed: the wallpaper window took 14 s+ until some other event arrived).
-fn with_loop_awake<T>(app: &AppHandle, f: impl FnOnce() -> T) -> T {
-    let done = Arc::new(AtomicBool::new(false));
-    let (handle, flag) = (app.clone(), done.clone());
-    std::thread::spawn(move || {
-        while !flag.load(Ordering::Relaxed) {
-            let _ = handle.run_on_main_thread(|| {});
-            std::thread::sleep(Duration::from_millis(30));
-        }
-    });
-    let out = f();
-    done.store(true, Ordering::Relaxed);
-    out
+/// Monitors the wallpaper should cover (physical px) and their bounding box.
+struct WallpaperArea {
+    monitors: Vec<PxRect>,
+    span: PxRect,
+}
+
+fn px_rect(m: &tauri::Monitor) -> PxRect {
+    PxRect {
+        x: m.position().x,
+        y: m.position().y,
+        w: m.size().width as i32,
+        h: m.size().height as i32,
+    }
+}
+
+/// Resolves the configured wallpaper target: every monitor ("all"), a named one, or the primary.
+fn wallpaper_area(app: &AppHandle, cfg: &AppConfig) -> Result<WallpaperArea, String> {
+    let primary = app
+        .primary_monitor()
+        .map_err(err)?
+        .ok_or("no monitor found")?;
+    let all = app.available_monitors().map_err(err)?;
+    let monitors: Vec<PxRect> = match cfg.wallpaper_monitor.as_deref() {
+        Some(config::ALL_MONITORS) if all.len() > 1 => all.iter().map(px_rect).collect(),
+        Some(name) => all
+            .iter()
+            .filter(|m| m.name().map(String::as_str) == Some(name))
+            .map(px_rect)
+            .collect(),
+        None => Vec::new(),
+    };
+    let monitors = if monitors.is_empty() {
+        vec![px_rect(&primary)]
+    } else {
+        monitors
+    };
+    let span = config::span(&monitors).ok_or("no monitor found")?;
+    Ok(WallpaperArea { monitors, span })
 }
 
 /// Window creation must not run on the main thread's event handlers on Windows (WebView2
@@ -156,8 +219,9 @@ fn on_menu(app: &AppHandle, event: MenuEvent) {
         "toggle" => spawn_task(app, toggle_pet),
         "mode-overlay" => spawn_task(app, |a| apply_mode(a, Mode::Overlay)),
         "mode-terrarium" => spawn_task(app, |a| apply_mode(a, Mode::Terrarium)),
-        "mode-wallpaper" => spawn_task(app, |a| apply_mode(a, Mode::Wallpaper)),
+        "mode-wallpaper" => spawn_task(app, wallpaper_from_tray),
         "settings" => spawn_task(app, open_settings),
+        "update" => open_update(app),
         "quit" => {
             remember_terrarium(app);
             state(app).update(true, |_| {});
@@ -208,14 +272,14 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
     // Read the mode only once we hold the lock: the last switch wins.
     let cfg = st.snapshot();
     // Switches queued behind us may already be satisfied by the window we just built.
-    let built_mode = st
+    let built = st
         .pet_label
         .lock()
         .expect("pet label lock")
         .as_ref()
-        .map(|(_, m)| *m);
-    if let (Some(win), Some(mode)) = (current_pet(app), built_mode) {
-        if mode == cfg.mode {
+        .map(|(_, sig)| sig.clone());
+    if let (Some(win), Some(sig)) = (current_pet(app), built) {
+        if sig == pet_signature(&cfg) {
             if !cfg.hidden {
                 win.show().map_err(err)?;
             }
@@ -234,14 +298,24 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
         .map_err(err)?
         .ok_or("no monitor found")?;
     let scale = monitor.scale_factor();
-    let url = WebviewUrl::App(format!("index.html?mode={}", cfg.mode.as_str()).into());
+    // Wallpaper may cover several monitors: one window over their bounding box, and the engine
+    // gets each monitor's rect so every one has its own scene and ground.
+    let wall = wallpaper_area(app, &cfg)?;
+    let mut query = format!("mode={}", cfg.mode.as_str());
+    if cfg.mode == Mode::Wallpaper && wall.monitors.len() > 1 {
+        query += &format!(
+            "&segments={}",
+            config::segments_param(&wall.monitors, &wall.span)
+        );
+    }
+    let url = WebviewUrl::App(format!("index.html?{query}").into());
     let builder = WebviewWindowBuilder::new(app, &label, url)
         .title("Clawd")
         .decorations(false)
         .shadow(false)
         .visible(false);
 
-    let win: WebviewWindow = with_loop_awake(app, || -> Result<WebviewWindow, String> {
+    let win: WebviewWindow = (|| -> Result<WebviewWindow, String> {
         Ok(match cfg.mode {
             Mode::Overlay => {
                 let wa = monitor.work_area();
@@ -279,7 +353,7 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
                     .map_err(err)?
             }
             Mode::Wallpaper => {
-                let (pos, size) = (monitor.position(), monitor.size());
+                let s = wall.span;
                 let builder = builder
                     .skip_taskbar(true)
                     .resizable(false)
@@ -287,16 +361,16 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
                     // Created on top: WebView2 stalls initialising a window that starts fully
                     // covered by other windows. Dropped right after, before going behind the icons.
                     .always_on_top(true)
-                    .position(pos.x as f64 / scale, pos.y as f64 / scale)
-                    .inner_size(size.width as f64 / scale, size.height as f64 / scale);
+                    .position(s.x as f64 / scale, s.y as f64 / scale)
+                    .inner_size(s.w as f64 / scale, s.h as f64 / scale);
                 #[cfg(not(windows))]
                 let builder = builder.always_on_bottom(true);
                 builder.build().map_err(err)?
             }
         })
-    })?;
+    })()?;
 
-    *st.pet_label.lock().expect("pet label lock") = Some((label.clone(), cfg.mode));
+    *st.pet_label.lock().expect("pet label lock") = Some((label.clone(), pet_signature(&cfg)));
     eprintln!("[clawd] pet window built ({label})");
     match cfg.mode {
         Mode::Overlay => win.set_ignore_cursor_events(true).map_err(err)?,
@@ -307,14 +381,8 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
             #[cfg(windows)]
             {
                 let hwnd = win.hwnd().map_err(err)?.0 as windows_sys::Win32::Foundation::HWND;
-                let (pos, size) = (monitor.position(), monitor.size());
-                match desktop::attach_behind_icons(
-                    hwnd,
-                    pos.x,
-                    pos.y,
-                    size.width as i32,
-                    size.height as i32,
-                ) {
+                let s = wall.span;
+                match desktop::attach_behind_icons(hwnd, s.x, s.y, s.w, s.h) {
                     Ok(how) => eprintln!("[clawd] wallpaper attached ({how})"),
                     Err(e) => {
                         eprintln!("[clawd] wallpaper attach failed: {e}; staying a normal window")
@@ -360,13 +428,26 @@ fn toggle_pet(app: &AppHandle) -> Result<(), String> {
 }
 
 fn open_settings(app: &AppHandle) -> Result<(), String> {
+    open_settings_asking(app, false)
+}
+
+/// Opens (or focuses) the settings window; `ask_monitor` highlights the "which monitor?" question.
+fn open_settings_asking(app: &AppHandle, ask_monitor: bool) -> Result<(), String> {
     if let Some(w) = app.get_webview_window(SETTINGS) {
         w.show().map_err(err)?;
+        if ask_monitor {
+            w.emit("ask-monitor", ()).map_err(err)?;
+        }
         return w.set_focus().map_err(err);
     }
-    let win = WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("settings.html".into()))
+    let page = if ask_monitor {
+        "settings.html?ask=monitor"
+    } else {
+        "settings.html"
+    };
+    let win = WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App(page.into()))
         .title("Clawd")
-        .inner_size(540.0, 790.0)
+        .inner_size(540.0, 820.0)
         .min_inner_size(420.0, 520.0)
         .center()
         .build()
@@ -382,7 +463,96 @@ fn open_settings(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Tray → Wallpaper: switch right away; with several monitors and no choice yet, also ask which.
+fn wallpaper_from_tray(app: &AppHandle) -> Result<(), String> {
+    apply_mode(app, Mode::Wallpaper)?;
+    let monitors = app.available_monitors().map_err(err)?.len();
+    if monitors > 1 && state(app).snapshot().wallpaper_monitor.is_none() {
+        open_settings_asking(app, true)?;
+    }
+    Ok(())
+}
+
+fn open_update(app: &AppHandle) {
+    use tauri_plugin_opener::OpenerExt;
+    let url = state(app)
+        .update
+        .lock()
+        .expect("update lock")
+        .as_ref()
+        .map(|u| u.url.clone());
+    if let Some(url) = url.filter(|u| u.starts_with(RELEASES_URL)) {
+        if let Err(e) = app.opener().open_url(url, None::<&str>) {
+            eprintln!("[clawd] could not open the release page: {e}");
+        }
+    }
+}
+
 // --- Commands ---------------------------------------------------------------------------------
+
+#[tauri::command]
+fn list_monitors(app: AppHandle) -> Result<Vec<MonitorInfo>, String> {
+    let primary = app.primary_monitor().map_err(err)?.map(|m| px_rect(&m));
+    let mut list: Vec<MonitorInfo> = app
+        .available_monitors()
+        .map_err(err)?
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            let r = px_rect(m);
+            MonitorInfo {
+                id: m.name().cloned().unwrap_or_else(|| format!("monitor-{i}")),
+                width: r.w as u32,
+                height: r.h as u32,
+                x: r.x,
+                y: r.y,
+                primary: Some(r) == primary,
+            }
+        })
+        .collect();
+    list.sort_by_key(|m| (m.x, m.y));
+    Ok(list)
+}
+
+#[tauri::command]
+async fn set_wallpaper_monitor(app: AppHandle, target: String) -> Result<(), String> {
+    let cfg = state(&app).update(true, |c| c.wallpaper_monitor = Some(target));
+    if cfg.mode == Mode::Wallpaper {
+        open_pet(&app)?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn set_check_updates(app: AppHandle, on: bool) {
+    state(&app).update(true, |c| c.check_updates = on);
+    if !on {
+        *state(&app).update.lock().expect("update lock") = None;
+        refresh_tray(&app);
+    }
+}
+
+/// Called by the pet window's update check when GitHub has a newer release.
+#[tauri::command]
+fn set_update_available(app: AppHandle, version: String, url: String) -> Result<(), String> {
+    if !url.starts_with(RELEASES_URL) {
+        return Err("unexpected release URL".into());
+    }
+    let info = UpdateInfo { version, url };
+    *state(&app).update.lock().expect("update lock") = Some(info.clone());
+    refresh_tray(&app);
+    app.emit("update-available", info).map_err(err)
+}
+
+#[tauri::command]
+fn get_update(app: AppHandle) -> Option<UpdateInfo> {
+    state(&app).update.lock().expect("update lock").clone()
+}
+
+#[tauri::command]
+fn open_update_page(app: AppHandle) {
+    open_update(&app);
+}
 
 #[tauri::command]
 fn get_config(app: AppHandle) -> AppConfig {
@@ -466,6 +636,7 @@ pub fn run() {
                 pet_label: Mutex::new(None),
                 pet_seq: AtomicU32::new(1),
                 pet_lock: Mutex::new(()),
+                update: Mutex::new(None),
             });
 
             let handle = app.handle().clone();
@@ -502,7 +673,13 @@ pub fn run() {
             finish_onboarding,
             set_terrarium_on_top,
             set_ui_lang,
-            open_settings_window
+            open_settings_window,
+            list_monitors,
+            set_wallpaper_monitor,
+            set_check_updates,
+            set_update_available,
+            get_update,
+            open_update_page
         ])
         .build(tauri::generate_context!())
         .expect("error while building Clawd Pet")
