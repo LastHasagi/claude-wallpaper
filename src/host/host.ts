@@ -1,4 +1,5 @@
 import type { Rect } from '../shared/geometry';
+import type { Lang } from '../shared/i18n';
 
 /** full: the whole ASCII scene is drawn (terrarium / wallpaper). overlay: transparent pet over the desktop. */
 export type DisplayMode = 'full' | 'overlay';
@@ -32,4 +33,8 @@ export interface HostAdapter {
   setInteractiveRects(rects: Rect[]): void;
   systemLanguage(): string;
   systemPrefersDark(): boolean;
+  /** Settings changed elsewhere (e.g. the app's settings window); the engine applies the patch. */
+  onExternalSettings?(cb: (patch: Record<string, unknown>) => void): void;
+  /** The engine's resolved language, so native UI (tray menu) can follow it. */
+  languageChanged?(lang: Lang): void;
 }

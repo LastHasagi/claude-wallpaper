@@ -1,29 +1,9 @@
 import type { Rect } from '../shared/geometry';
-import type { CursorEvent, CursorSource, DisplayMode, HostAdapter, HostStorage } from './host';
+import type { CursorEvent, CursorSource, DisplayMode, HostAdapter } from './host';
+import { LocalStorage } from './local-storage';
 
 /** Simulated taskbar height used when previewing overlay mode in a browser. */
 const FAKE_TASKBAR = 48;
-
-class LocalStorage implements HostStorage {
-  private memory = new Map<string, string>();
-
-  get(key: string): string | null {
-    try {
-      return window.localStorage.getItem(key);
-    } catch {
-      return this.memory.get(key) ?? null;
-    }
-  }
-
-  set(key: string, value: string): void {
-    this.memory.set(key, value);
-    try {
-      window.localStorage.setItem(key, value);
-    } catch {
-      /* private mode / blocked storage: keep the in-memory copy */
-    }
-  }
-}
 
 class DomCursor implements CursorSource {
   constructor(private readonly target: Window) {}
@@ -43,6 +23,7 @@ class DomCursor implements CursorSource {
   }
 }
 
+/** Host for running the engine in a plain browser tab (development, E2E). */
 export class BrowserHost implements HostAdapter {
   readonly mode: DisplayMode;
   readonly storage = new LocalStorage();

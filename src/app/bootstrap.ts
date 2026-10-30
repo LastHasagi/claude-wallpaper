@@ -8,7 +8,7 @@ import { ClawdController, ClawdView, type ClawdEvents } from '../features/clawd'
 import { Director, MISSIONS, TerminalView, missionLabel, type MissionEvents, type MissionId } from '../features/missions';
 import { FACTS, NotePicker, NotesController, NoteView, type NotesEvents } from '../features/notes';
 import { SceneController } from '../features/scene';
-import { SettingsController, overridesFromParams, type SettingsEvents } from '../features/settings';
+import { SettingsController, overridesFromParams, type Settings, type SettingsEvents } from '../features/settings';
 import { FrameStats } from './debug';
 import { GameLoop } from './game-loop';
 
@@ -83,7 +83,11 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
   layout();
   win.addEventListener('resize', layout);
 
+  host.languageChanged?.(lang());
+  host.onExternalSettings?.((patch) => settings.set(patch as Partial<Settings>));
+
   bus.on('settings:changed', ({ changed, resolved }) => {
+    if (changed.includes('language')) host.languageChanged?.(resolved.lang);
     if (changed.includes('theme')) applyTheme();
     if (changed.includes('size')) layout();
     if (changed.includes('fps')) loop.fps = resolved.fps;

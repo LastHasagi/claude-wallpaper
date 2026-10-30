@@ -25,7 +25,8 @@ const errors = [];
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 page.on('pageerror', (e) => errors.push(String(e)));
 const start = Date.now();
-await page.goto(`${base}/?${query}`);
+// A query starting with a page ("settings.html?x=1") opens that page instead of the engine.
+await page.goto(/^[\w-]+\.html/.test(query) ? `${base}/${query}` : `${base}/?${query}`);
 mkdirSync(dirname(prefix), { recursive: true });
 const shots = [];
 for (const t of times.split(',').map(Number)) {

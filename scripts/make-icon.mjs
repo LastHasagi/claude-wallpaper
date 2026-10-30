@@ -1,0 +1,82 @@
+// Renders Clawd's idle sprite (straight from the engine's sprite data) into a 1024×1024 PNG.
+//   node scripts/make-icon.mjs [out=artifacts/icon.png]
+// Then: npx tauri icon artifacts/icon.png
+import { createServer } from 'vite';
+import { deflateSync } from 'node:zlib';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+
+const out = process.argv[2] ?? 'artifacts/icon.png';
+const SIZE = 1024;
+
+const vite = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent' });
+const { POSES } = await vite.ssrLoadModule('/src/features/clawd/sprites/body.ts');
+const { EYES } = await vite.ssrLoadModule('/src/features/clawd/sprites/eyes.ts');
+await vite.close();
+
+const frame = POSES.idle.frames[0];
+const body = frame.sprite;
+// Compose body + eyes into one 36×22 colour grid.
+const grid = body.pixels.slice();
+const eyes = EYES.open;
+for (let y = 0; y < eyes.h; y++) {
+  for (let x = 0; x < eyes.w; x++) {
+    const c = eyes.pixels[y * eyes.w + x];
+    if (c) grid[(frame.eyes.y + y) * body.w + frame.eyes.x + x] = c;
+  }
+}
+
+// Fit the sprite into the square with a margin, nearest-neighbour scaling.
+const scale = Math.floor((SIZE * 0.9) / body.w);
+const ox = Math.floor((SIZE - body.w * scale) / 2);
+const oy = Math.floor((SIZE - body.h * scale) / 2);
+const rgba = Buffer.alloc(SIZE * SIZE * 4);
+for (let y = 0; y < body.h; y++) {
+  for (let x = 0; x < body.w; x++) {
+    const c = grid[y * body.w + x];
+    if (!c) continue;
+    const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
+    for (let yy = 0; yy < scale; yy++) {
+      for (let xx = 0; xx < scale; xx++) {
+        const i = ((oy + y * scale + yy) * SIZE + ox + x * scale + xx) * 4;
+        rgba[i] = r; rgba[i + 1] = g; rgba[i + 2] = b; rgba[i + 3] = 255;
+      }
+    }
+  }
+}
+
+// Minimal PNG encoder (RGBA, no filtering).
+const crcTable = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+const crc32 = (buf) => {
+  let c = 0xffffffff;
+  for (const byte of buf) c = crcTable[(c ^ byte) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+};
+const chunk = (type, data) => {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length);
+  const td = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(td));
+  return Buffer.concat([len, td, crc]);
+};
+const ihdr = Buffer.alloc(13);
+ihdr.writeUInt32BE(SIZE, 0);
+ihdr.writeUInt32BE(SIZE, 4);
+ihdr[8] = 8; // bit depth
+ihdr[9] = 6; // RGBA
+const raw = Buffer.alloc(SIZE * (SIZE * 4 + 1));
+for (let y = 0; y < SIZE; y++) rgba.copy(raw, y * (SIZE * 4 + 1) + 1, y * SIZE * 4, (y + 1) * SIZE * 4);
+const png = Buffer.concat([
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  chunk('IHDR', ihdr),
+  chunk('IDAT', deflateSync(raw, { level: 9 })),
+  chunk('IEND', Buffer.alloc(0)),
+]);
+mkdirSync(dirname(out), { recursive: true });
+writeFileSync(out, png);
+console.log(`wrote ${out} (${png.length} bytes)`);

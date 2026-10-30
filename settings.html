@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clawd</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 36 22%27%3E%3Crect x=%276%27 y=%272%27 width=%2724%27 height=%2716%27 fill=%27%23d77757%27/%3E%3Crect x=%2710%27 y=%276%27 width=%272%27 height=%274%27/%3E%3Crect x=%2724%27 y=%276%27 width=%272%27 height=%274%27/%3E%3C/svg%3E" />
+    <style>
+      :root {
+        --bg: #141413; --paper: #26241f; --ink: #e6e0d3; --mid: #8a857b; --dim: #55524b; --faint: #34322e; --accent: #d77757;
+        --font: "Cascadia Mono", Consolas, "DejaVu Sans Mono", Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font); }
+      body { padding: 22px 26px 18px; }
+      header { display: flex; gap: 16px; align-items: center; margin-bottom: 18px; }
+      #mascot { image-rendering: pixelated; flex: none; }
+      h1 { margin: 0; font-size: 19px; color: var(--accent); }
+      header p { margin: 4px 0 0; color: var(--mid); }
+      h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--mid); margin: 18px 0 8px; font-weight: 600; }
+      .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .mode { all: unset; cursor: pointer; border: 1px solid var(--faint); background: var(--paper); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+      .mode pre { margin: 0; color: var(--dim); font-size: 11px; line-height: 1.15; }
+      .mode b { color: var(--ink); font-size: 13px; }
+      .mode span { color: var(--mid); font-size: 11.5px; line-height: 1.35; }
+      .mode[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+      .mode[aria-pressed="true"] pre { color: var(--accent); }
+      .mode:focus-visible, .seg button:focus-visible, .primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--faint); }
+      .row label { color: var(--ink); }
+      .seg { display: inline-flex; border: 1px solid var(--faint); border-radius: 6px; overflow: hidden; flex: none; }
+      .seg button { all: unset; cursor: pointer; padding: 4px 10px; color: var(--mid); font-size: 12.5px; }
+      .seg button + button { border-left: 1px solid var(--faint); }
+      .seg button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+      .switch { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+      footer { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+      .primary { all: unset; cursor: pointer; background: var(--accent); color: var(--bg); font-weight: 700; padding: 8px 18px; border-radius: 6px; }
+      footer small { color: var(--dim); font-size: 11px; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <canvas id="mascot" width="36" height="22"></canvas>
+      <div><h1 id="title"></h1><p id="subtitle"></p></div>
+    </header>
+    <h2 id="mode-heading"></h2>
+    <div class="modes" id="modes"></div>
+    <h2 id="prefs-heading"></h2>
+    <div id="prefs"></div>
+    <footer>
+      <small id="fan"></small>
+      <button class="primary" id="start" hidden></button>
+    </footer>
+    <script type="module" src="/src/settings-ui/main.ts"></script>
+  </body>
+</html>

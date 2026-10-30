@@ -6,3 +6,6 @@ coverage/
 *.log
 artifacts/
 src-tauri/target/
+
+# Tauri
+src-tauri/gen/
