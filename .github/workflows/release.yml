@@ -1,0 +1,87 @@
+# Publishes a GitHub Release with installers for Windows, macOS and Linux.
+#
+# To release: bump "version" in src-tauri/tauri.conf.json (and package.json), commit, then
+#   git tag v0.2.0 && git push origin v0.2.0
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+# Read-only by default; only the publish job may write (create the release).
+# Third-party actions are pinned to commit SHAs (kept fresh by Dependabot).
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tag must match the app version
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match app version v$version (src-tauri/tauri.conf.json)"
+            exit 1
+          fi
+      - run: npm run typecheck
+      - run: npm test
+
+  publish:
+    needs: test
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: ''
+          - os: macos-latest
+            args: '--target universal-apple-darwin'
+          - os: ubuntu-22.04
+            args: ''
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - name: Linux system libraries
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - run: npm ci
+      # Builds the installers and creates (or updates) the release for this tag.
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # action-v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Clawd Pet ${{ github.ref_name }}
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
+          releaseBody: |
+            **Clawd Pet** ${{ github.ref_name }}: um pet de desktop que vive em cenários de ASCII art, sai em missões, traz curiosidades e reage ao mouse.
+
+            ![demo](https://raw.githubusercontent.com/${{ github.repository }}/main/docs/media/clawd-demo.gif)
+
+            ### Instalar
+            - **Windows:** baixe o `*_x64-setup.exe` (ou o `.msi`). O instalador não é assinado, então o SmartScreen pode avisar: "Mais informações" → "Executar assim mesmo".
+            - **macOS:** baixe o `.dmg` (universal). Não é assinado: na primeira vez, clique com o botão direito no app → Abrir.
+            - **Linux:** `.AppImage`, `.deb` ou `.rpm`.
+
+            Criado por **Rodrigo Graça** · [GitHub](https://github.com/LastHasagi) · [LinkedIn](https://www.linkedin.com/in/rodrigo-de-souza-graca/)
+            Licença [PolyForm Noncommercial 1.0.0](https://github.com/${{ github.repository }}/blob/main/LICENSE): uso livre não comercial, com crédito obrigatório.

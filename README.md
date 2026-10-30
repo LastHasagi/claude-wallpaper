@@ -2,11 +2,11 @@
 
 Um pet de desktop do Clawd, o mascote do Claude Code. Ele vive em cenários de ASCII art, sai em missões, traz curiosidades num bloco de notas e reage ao mouse.
 
-> Projeto de fã, não oficial. Claude, Claude Code e o Clawd são marcas da Anthropic.
+Criado por **Rodrigo Graça** · [GitHub](https://github.com/LastHasagi) · [LinkedIn](https://www.linkedin.com/in/rodrigo-de-souza-graca/)
 
 ![Clawd observando pássaros, programando e cochilando num livro](docs/media/clawd-demo.gif)
 
-**Instalar:** gere o instalador com `npm run tauri build` (veja abaixo). No Windows sai um `.exe` de ~1 MB. Ele não é assinado, então o SmartScreen pode mostrar um aviso ("Mais informações" → "Executar assim mesmo"). Para macOS e Linux, use o workflow do GitHub Actions descrito abaixo.
+**Instalar:** baixe o instalador da sua plataforma em [Releases](https://github.com/LastHasagi/claude-wallpaper/releases) (Windows `.exe`/`.msi`, macOS `.dmg`, Linux `.AppImage`/`.deb`/`.rpm`). Os instaladores não são assinados. No Windows, o SmartScreen pode avisar: "Mais informações" → "Executar assim mesmo". No macOS, na primeira vez, clique com o botão direito no app → Abrir.
 
 ## Rodando
 
@@ -52,7 +52,14 @@ Linha de comando: `clawd-pet --mode overlay|terrarium|wallpaper`. Com o app já 
 
 O config do app fica em `%APPDATA%\dev.clawdpet.app\config.json` (Windows). As preferências do motor ficam no armazenamento local do WebView.
 
-**Compilação para macOS e Linux:** o workflow `.github/workflows/build.yml` gera os instaladores das 3 plataformas no GitHub Actions (ao criar uma tag `v*` ou manualmente) e não publica nada sozinho.
+### Publicando uma versão
+
+Releases são automáticas (`.github/workflows/release.yml`):
+
+1. Suba a `version` em `src-tauri/tauri.conf.json` e no `package.json`, e faça commit.
+2. `git tag v0.2.0 && git push origin v0.2.0`
+
+O GitHub Actions roda os testes, confere se a tag bate com a versão do app, compila Windows, macOS (universal) e Linux e publica a release com os instaladores. Em todo push e pull request, o `ci.yml` roda o typecheck e os testes.
 
 **Limitações conhecidas:** só o monitor principal; no modo papel de parede o Clawd não recebe cliques (quem recebe é a área de trabalho), mas os olhos seguem o cursor e ele acena; com a barra de tarefas em ocultar automaticamente, o pet solto anda rente à borda inferior.
 
@@ -76,3 +83,13 @@ src/
 Duas camadas de canvas: o fundo ASCII só redesenha as células que mudaram (normalmente dezenas por frame), e a frente (sprites e interface) é redesenhada a cada frame. Em 1080p o render fica abaixo de 1 ms por frame.
 
 Documentos: [spec](docs/superpowers/specs/2026-10-30-clawd-engine-design.md) · [plano](docs/superpowers/plans/2026-10-30-clawd-engine.md)
+
+## Licença
+
+[PolyForm Noncommercial 1.0.0](LICENSE). Na prática:
+
+- ✅ pode ler, usar, modificar e compartilhar para fins **não comerciais** (uso pessoal, estudo, pesquisa, organizações sem fins lucrativos);
+- ✅ **crédito obrigatório**: toda cópia ou derivado precisa manter as linhas `Required Notice` do [LICENSE](LICENSE) (autor e links);
+- ❌ **uso comercial** (vender, embutir em produto pago etc.) só com autorização do autor.
+
+Claude, Claude Code e o Clawd são marcas da Anthropic. Este projeto não é afiliado nem endossado pela Anthropic.

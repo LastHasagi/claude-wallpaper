@@ -21,11 +21,23 @@
     "active": true,
     "targets": "all",
     "category": "Entertainment",
-    "shortDescription": "Clawd, um pet de desktop que vive em cenários ASCII",
-    "longDescription": "Clawd vive em cenários de ASCII art, sai em missões, traz curiosidades e reage ao mouse. Projeto de fã, não oficial.",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "shortDescription": "Clawd Pet, um pet de desktop em cenários ASCII, por Rodrigo Graça",
+    "longDescription": "Clawd vive em cenários de ASCII art, sai em missões, traz curiosidades e reage ao mouse. Criado por Rodrigo Graça (github.com/LastHasagi · linkedin.com/in/rodrigo-de-souza-graca).",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
     "windows": {
-      "nsis": { "installMode": "currentUser" }
-    }
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "publisher": "Rodrigo Graça",
+    "copyright": "Copyright (c) 2026 Rodrigo Graça",
+    "homepage": "https://github.com/LastHasagi/claude-wallpaper",
+    "licenseFile": "../LICENSE"
   }
 }

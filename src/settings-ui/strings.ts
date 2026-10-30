@@ -10,7 +10,7 @@ const pt = {
   mode: 'Modo',
   prefs: 'Preferências',
   start: 'Começar',
-  fan: 'Projeto de fã, não oficial.',
+  credit: 'Feito por Rodrigo Graça',
   modes: {
     overlay: ['Pet solto', 'Anda por cima de tudo, acima da barra de tarefas. Os cliques atravessam.'],
     terrarium: ['Terrário', 'Uma janelinha com o cenário completo. Arraste pelo topo.'],
@@ -34,7 +34,7 @@ const en: typeof pt = {
   mode: 'Mode',
   prefs: 'Preferences',
   start: 'Start',
-  fan: 'Fan project, not official.',
+  credit: 'Made by Rodrigo Graça',
   modes: {
     overlay: ['Free-roaming pet', 'Walks on top of everything, above the taskbar. Clicks go through.'],
     terrarium: ['Terrarium', 'A small window with the full scene. Drag it by the top edge.'],
@@ -51,6 +51,12 @@ const en: typeof pt = {
 };
 
 export const STRINGS: Record<Lang, typeof pt> = { pt, en };
+
+/** Author links shown in the settings footer (also allow-listed in the Tauri capabilities). */
+export const AUTHOR_LINKS = [
+  { label: 'GitHub', url: 'https://github.com/LastHasagi' },
+  { label: 'LinkedIn', url: 'https://www.linkedin.com/in/rodrigo-de-souza-graca/' },
+] as const;
 
 /** Tiny ASCII pictograms for the mode cards. */
 export const MODE_ART: Record<NativeMode, string> = {

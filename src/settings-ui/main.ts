@@ -6,7 +6,8 @@ import { PALETTES } from '../shared/render/roles';
 import { LocalStorage } from '../host/local-storage';
 import { portrait } from '../features/clawd';
 import { SettingsController, type Settings, type SettingsEvents } from '../features/settings';
-import { MODE_ART, STRINGS, type NativeMode } from './strings';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import { AUTHOR_LINKS, MODE_ART, STRINGS, type NativeMode } from './strings';
 
 interface AppConfig {
   mode: NativeMode;
@@ -107,6 +108,25 @@ function toggleRow(text: string, checked: boolean, onChange: (on: boolean) => vo
   return row;
 }
 
+/** "Feito por Rodrigo Graça · GitHub · LinkedIn" — links open in the system browser. */
+function renderCredit(text: string): void {
+  const parts: (string | HTMLElement)[] = [text];
+  for (const { label, url } of AUTHOR_LINKS) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.textContent = label;
+    a.rel = 'noopener noreferrer';
+    a.target = '_blank';
+    a.addEventListener('click', (e) => {
+      if (!inTauri) return; // plain browser: let the link open normally
+      e.preventDefault();
+      void openUrl(url).catch(console.error);
+    });
+    parts.push(' · ', a);
+  }
+  $('credit').replaceChildren(...parts);
+}
+
 function render(): void {
   applyTheme();
   const s = STRINGS[settings.resolved().lang];
@@ -115,7 +135,7 @@ function render(): void {
   $('subtitle').textContent = welcome ? s.welcomeSub : s.settingsSub;
   $('mode-heading').textContent = s.mode;
   $('prefs-heading').textContent = s.prefs;
-  $('fan').textContent = s.fan;
+  renderCredit(s.credit);
   const start = $<HTMLButtonElement>('start');
   start.hidden = !welcome;
   start.textContent = s.start;

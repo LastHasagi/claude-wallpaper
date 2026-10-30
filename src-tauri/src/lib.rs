@@ -440,6 +440,8 @@ async fn open_settings_window(app: AppHandle) -> Result<(), String> {
 
 pub fn run() {
     tauri::Builder::default()
+        // Opens the author's links (GitHub, LinkedIn) from the settings window; scoped in capabilities.
+        .plugin(tauri_plugin_opener::init())
         // Launching again either switches mode (`--mode terrarium`) or brings up the settings.
         .plugin(tauri_plugin_single_instance::init(
             |app, argv, _cwd| match config::mode_from_args(&argv) {

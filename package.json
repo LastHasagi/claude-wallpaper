@@ -30,6 +30,14 @@
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.4",
-    "@tauri-apps/plugin-autostart": "2.7.0"
+    "@tauri-apps/plugin-autostart": "2.7.0",
+    "@tauri-apps/plugin-opener": "2.7.2"
+  },
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "author": "Rodrigo Graça (https://github.com/LastHasagi)",
+  "homepage": "https://github.com/LastHasagi/claude-wallpaper",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LastHasagi/claude-wallpaper.git"
   }
 }
