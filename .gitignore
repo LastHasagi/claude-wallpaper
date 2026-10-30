@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.superpowers/
+.remember/
+coverage/
+*.log
+artifacts/
+src-tauri/target/
