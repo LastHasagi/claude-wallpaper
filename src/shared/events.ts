@@ -1,7 +1,14 @@
 type Listener<P> = (payload: P) => void;
 
+/** What features depend on: a bus that knows (at least) their own events. */
+export interface Bus<M extends object> {
+  on<K extends keyof M>(type: K, fn: Listener<M[K]>): () => void;
+  once<K extends keyof M>(type: K, fn: Listener<M[K]>): () => void;
+  emit<K extends keyof M>(type: K, payload: M[K]): void;
+}
+
 /** Small typed pub/sub. A failing listener is logged and never breaks the others. */
-export class EventBus<M extends object> {
+export class EventBus<M extends object> implements Bus<M> {
   private listeners = new Map<keyof M, Set<Listener<never>>>();
 
   on<K extends keyof M>(type: K, fn: Listener<M[K]>): () => void {

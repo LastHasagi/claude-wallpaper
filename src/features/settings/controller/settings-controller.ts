@@ -1,4 +1,4 @@
-import type { EventBus } from '../../../shared/events';
+import type { Bus } from '../../../shared/events';
 import type { HostStorage } from '../../../host/host';
 import {
   changedKeys,
@@ -25,7 +25,7 @@ export class SettingsController {
 
   constructor(
     private readonly storage: HostStorage,
-    private readonly bus: EventBus<SettingsEvents>,
+    private readonly bus: Bus<SettingsEvents>,
     private readonly env: SettingsEnv,
     private readonly overrides: Partial<Record<keyof Settings, unknown>> = {},
   ) {

@@ -67,7 +67,7 @@ Regras:
 - **fg:** sprites, objetos animados, bilhete, emotes e interface. Limpo a cada frame; a área ocupada é pequena.
 - A célula vem da fonte monoespaçada medida em runtime. O número de colunas é `clamp(largura/10, 80, 200)`, o que dá ~192 colunas em 1080p e 80 no terrário de 480 px. O canvas usa DPR para ficar nítido.
 - Cores usam **papéis semânticos** (`bg`, `faint`, `dim`, `mid`, `strong`, `accent`), e cada tema mapeia esses papéis para hex. Nenhuma feature usa hex direto, exceto a paleta do sprite do Clawd.
-- **Escala do sprite:** inteira em pixels de dispositivo: `round(cellW × sizeCells / 36 × dpr)`, com `sizeCells` P=6, M=9, G=13.
+- **Escala do sprite:** inteira em pixels de dispositivo: `round(cellW × sizeCells / 36 × dpr)`, com `sizeCells` P=8, M=12, G=16.
 
 ### HostAdapter
 ```ts
