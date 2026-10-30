@@ -6,7 +6,7 @@ Um pet de desktop do Clawd, o mascote do Claude Code. Ele vive em cenários de A
 
 ![Clawd observando pássaros, programando e cochilando num livro](docs/media/clawd-demo.gif)
 
-**Baixar (Windows):** o instalador está em [Releases](https://github.com/LastHasagi/claude-wallpaper/releases). Ele não é assinado, então o Windows SmartScreen pode mostrar um aviso ("Mais informações" → "Executar assim mesmo"). Para macOS e Linux, compile pelo workflow descrito abaixo.
+**Instalar:** gere o instalador com `npm run tauri build` (veja abaixo). No Windows sai um `.exe` de ~1 MB. Ele não é assinado, então o SmartScreen pode mostrar um aviso ("Mais informações" → "Executar assim mesmo"). Para macOS e Linux, use o workflow do GitHub Actions descrito abaixo.
 
 ## Rodando
 
