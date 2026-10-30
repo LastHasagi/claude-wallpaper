@@ -3,7 +3,7 @@ import type { Point, Rect } from '../../../shared/geometry';
 import type { Rng } from '../../../shared/rng';
 import type { Clock } from '../../../shared/time';
 import type { CursorEvent } from '../../../host/host';
-import { ActionQueue, hopTo, play, wait, walkTo, type PlayOptions } from '../model/actions';
+import { ActionQueue, hopTo, jump, play, wait, walkTo, type PlayOptions } from '../model/actions';
 import { ClawdModel, type Stage } from '../model/clawd-model';
 import type { PoseName } from '../sprites/body';
 import type { EyeState } from '../sprites/eyes';
@@ -18,6 +18,8 @@ export interface ClawdEvents {
 export interface MoveOptions {
   /** Multiplier over the normal walking speed. */
   speed?: number;
+  /** Pose used while moving (e.g. 'carry' with the notepad). */
+  pose?: PoseName;
   signal?: AbortSignal;
 }
 
@@ -29,6 +31,8 @@ export interface ClawdApi {
   wait(seconds: number, signal?: AbortSignal): Promise<void>;
   /** Hops onto a surface `elevation` px above the ground (0 = back to the ground). */
   hopTo(elevation: number, signal?: AbortSignal): Promise<void>;
+  /** A small hop in place. */
+  jump(signal?: AbortSignal): Promise<void>;
   hold(item: HeldItem | null): void;
   setHeldFrame(frame: number): void;
   setEyes(eyes: EyeState): void;
@@ -41,6 +45,8 @@ export interface ClawdApi {
   bodyWidth(): number;
   /** Missions switch autonomy off while they drive Clawd. */
   setAutonomy(on: boolean): void;
+  /** True while a mission drives him or his main queue has work. */
+  busy(): boolean;
   /** Stops whatever the main queue is doing (pending promises reject with AbortError). */
   cancel(): void;
 }
@@ -76,7 +82,7 @@ export class ClawdController implements ClawdApi {
   // --- ClawdApi -------------------------------------------------------------------------------
 
   walkTo(x: number, opts: MoveOptions = {}): Promise<void> {
-    return this.queue.enqueue(walkTo(x, this.model.bodyWidth() * (opts.speed ?? 1)), opts.signal);
+    return this.queue.enqueue(walkTo(x, this.model.bodyWidth() * (opts.speed ?? 1), opts.pose), opts.signal);
   }
 
   runTo(x: number, opts: MoveOptions = {}): Promise<void> {
@@ -93,6 +99,10 @@ export class ClawdController implements ClawdApi {
 
   hopTo(elevation: number, signal?: AbortSignal): Promise<void> {
     return this.queue.enqueue(hopTo(elevation, this.model.bodyWidth() * 0.3), signal);
+  }
+
+  jump(signal?: AbortSignal): Promise<void> {
+    return this.queue.enqueue(jump(this.model.bodyWidth() * 0.3), signal);
   }
 
   hold(item: HeldItem | null): void {
@@ -140,6 +150,10 @@ export class ClawdController implements ClawdApi {
     if (this.brain.autonomous === on) return;
     this.brain.autonomous = on;
     if (!on) this.queue.cancelMain('autonomy off');
+  }
+
+  busy(): boolean {
+    return !this.brain.autonomous || this.queue.reacting;
   }
 
   cancel(): void {

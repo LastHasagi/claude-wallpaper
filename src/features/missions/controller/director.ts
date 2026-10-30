@@ -113,6 +113,7 @@ export class Director {
       play: (pose, o) => clawd.play(pose, { ...o, signal }),
       wait: (s) => clawd.wait(s, signal),
       hopTo: (e) => clawd.hopTo(e, signal),
+      jump: () => clawd.jump(signal),
       hold: (i) => clawd.hold(i),
       setHeldFrame: (f) => clawd.setHeldFrame(f),
       setEyes: (e) => clawd.setEyes(e),
@@ -124,6 +125,7 @@ export class Director {
       bounds: () => clawd.bounds(),
       bodyWidth: () => clawd.bodyWidth(),
       setAutonomy: (on) => clawd.setAutonomy(on),
+      busy: () => clawd.busy(),
       cancel: () => clawd.cancel(),
     };
     const guardedScene: SceneApi = {
