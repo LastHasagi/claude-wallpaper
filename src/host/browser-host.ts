@@ -31,8 +31,11 @@ export class BrowserHost implements HostAdapter {
   /** Last rects reported by the engine; drawn by the debug overlay. */
   interactiveRects: Rect[] = [];
 
+  readonly fakeDesktop: boolean;
+
   constructor(params: URLSearchParams, private readonly win: Window = window) {
     this.mode = params.get('mode') === 'overlay' ? 'overlay' : 'full';
+    this.fakeDesktop = this.mode === 'overlay' && !params.has('transparent');
     this.cursor = new DomCursor(win);
   }
 

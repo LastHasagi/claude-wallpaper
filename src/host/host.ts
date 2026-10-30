@@ -25,6 +25,8 @@ export interface HostStorage {
 /** Everything the engine needs from whoever embeds it (browser page, Tauri window, …). */
 export interface HostAdapter {
   readonly mode: DisplayMode;
+  /** Browser preview only: paint a fake desktop behind the transparent overlay. Never in the app. */
+  readonly fakeDesktop?: boolean;
   /** CSS px between the bottom of the viewport and the ground Clawd walks on (e.g. the taskbar). */
   groundInset(): number;
   readonly storage: HostStorage;

@@ -147,7 +147,16 @@ fn remember_terrarium(app: &AppHandle) {
 }
 
 fn open_pet(app: &AppHandle) -> Result<(), String> {
+    let result = build_pet(app);
+    if let Err(e) = &result {
+        eprintln!("[clawd] could not open the pet window: {e}");
+    }
+    result
+}
+
+fn build_pet(app: &AppHandle) -> Result<(), String> {
     let cfg = state(app).snapshot();
+    eprintln!("[clawd] opening pet window ({})", cfg.mode.as_str());
     if let Some(old) = app.get_webview_window(PET) {
         remember_terrarium(app);
         old.destroy().map_err(err)?;
@@ -210,6 +219,7 @@ fn open_pet(app: &AppHandle) -> Result<(), String> {
         }
     };
 
+    eprintln!("[clawd] pet window built");
     match cfg.mode {
         Mode::Overlay => win.set_ignore_cursor_events(true).map_err(err)?,
         Mode::Wallpaper => {
@@ -229,6 +239,7 @@ fn open_pet(app: &AppHandle) -> Result<(), String> {
     if !cfg.hidden {
         win.show().map_err(err)?;
     }
+    eprintln!("[clawd] pet window ready");
     Ok(())
 }
 
@@ -259,7 +270,7 @@ fn open_settings(app: &AppHandle) -> Result<(), String> {
     }
     let win = WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("settings.html".into()))
         .title("Clawd")
-        .inner_size(520.0, 720.0)
+        .inner_size(540.0, 790.0)
         .min_inner_size(420.0, 520.0)
         .center()
         .build()

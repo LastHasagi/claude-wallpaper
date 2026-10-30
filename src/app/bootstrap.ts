@@ -67,7 +67,7 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
     backend.setTheme(PALETTES[theme]);
     doc.body.classList.toggle('full', host.mode === 'full');
     doc.body.classList.toggle('light', theme === 'light');
-    doc.body.classList.toggle('overlay-preview', host.mode === 'overlay' && !params.has('transparent'));
+    doc.body.classList.toggle('overlay-preview', host.fakeDesktop === true);
   }
 
   function layout(): void {
