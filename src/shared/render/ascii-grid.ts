@@ -26,6 +26,8 @@ export class AsciiGrid {
   }
 
   get(x: number, y: number): Cell | null {
+    x = Math.floor(x);
+    y = Math.floor(y);
     if (!this.inBounds(x, y)) return null;
     const i = y * this.cols + x;
     const r = this.roles[i]!;
@@ -33,6 +35,9 @@ export class AsciiGrid {
   }
 
   set(x: number, y: number, ch: string, role: ColorRole | null): void {
+    // Callers sometimes derive coordinates from fractional geometry; never index with a float.
+    x = Math.floor(x);
+    y = Math.floor(y);
     if (!this.inBounds(x, y)) return;
     const i = y * this.cols + x;
     this.chars[i] = ch;
@@ -40,6 +45,8 @@ export class AsciiGrid {
   }
 
   isEmpty(x: number, y: number): boolean {
+    x = Math.floor(x);
+    y = Math.floor(y);
     return !this.inBounds(x, y) || this.roles[y * this.cols + x] === NONE;
   }
 

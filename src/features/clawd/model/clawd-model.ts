@@ -22,7 +22,9 @@ const BLINK_TIME = 0.12;
 export class ClawdModel {
   /** Horizontal centre, CSS px. */
   x = 0;
-  /** Height above the ground, CSS px. */
+  /** Height of the surface he stands on (bench, rock), CSS px above the ground. */
+  elevation = 0;
+  /** Extra height while jumping, CSS px above `elevation`. */
   jumpY = 0;
   facing: 1 | -1 = 1;
   pose: PoseName = 'idle';
@@ -67,7 +69,12 @@ export class ClawdModel {
 
   bounds(): Rect {
     const w = BODY_W * this.stage.scale, h = BODY_H * this.stage.scale;
-    return { x: this.x - w / 2, y: this.stage.groundY - this.jumpY - h, w, h };
+    return { x: this.x - w / 2, y: this.feetY() - h, w, h };
+  }
+
+  /** Screen y of the soles of his feet, CSS px. */
+  feetY(): number {
+    return this.stage.groundY - this.elevation - this.jumpY;
   }
 
   center(): Point {

@@ -3,7 +3,7 @@ import type { Point, Rect } from '../../../shared/geometry';
 import type { Rng } from '../../../shared/rng';
 import type { Clock } from '../../../shared/time';
 import type { CursorEvent } from '../../../host/host';
-import { ActionQueue, play, wait, walkTo, type PlayOptions } from '../model/actions';
+import { ActionQueue, hopTo, play, wait, walkTo, type PlayOptions } from '../model/actions';
 import { ClawdModel, type Stage } from '../model/clawd-model';
 import type { PoseName } from '../sprites/body';
 import type { EyeState } from '../sprites/eyes';
@@ -27,6 +27,8 @@ export interface ClawdApi {
   runTo(x: number, opts?: MoveOptions): Promise<void>;
   play(pose: PoseName, opts?: PlayOptions & { signal?: AbortSignal }): Promise<void>;
   wait(seconds: number, signal?: AbortSignal): Promise<void>;
+  /** Hops onto a surface `elevation` px above the ground (0 = back to the ground). */
+  hopTo(elevation: number, signal?: AbortSignal): Promise<void>;
   hold(item: HeldItem | null): void;
   setHeldFrame(frame: number): void;
   setEyes(eyes: EyeState): void;
@@ -89,6 +91,10 @@ export class ClawdController implements ClawdApi {
     return this.queue.enqueue(wait(seconds), signal);
   }
 
+  hopTo(elevation: number, signal?: AbortSignal): Promise<void> {
+    return this.queue.enqueue(hopTo(elevation, this.model.bodyWidth() * 0.3), signal);
+  }
+
   hold(item: HeldItem | null): void {
     this.model.held = item;
     this.model.heldFrame = 0;
@@ -139,6 +145,8 @@ export class ClawdController implements ClawdApi {
   cancel(): void {
     this.queue.cancelMain();
     this.model.jumpY = 0;
+    this.model.elevation = 0;
+    this.model.held = null;
     this.model.eyes = 'open';
     this.model.setPose('idle');
   }

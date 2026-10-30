@@ -199,6 +199,30 @@ export function jump(height: number, duration = 0.45): Action {
   };
 }
 
+/** Hops from the current surface onto another one `elevation` px above the ground. */
+export function hopTo(elevation: number, arc: number, duration = 0.5): Action {
+  let t = 0, from = 0;
+  return {
+    name: `hopTo(${Math.round(elevation)})`,
+    start: (m) => {
+      from = m.elevation;
+      m.setPose('jump');
+    },
+    update: (m, dt) => {
+      t += dt;
+      const k = Math.min(t / duration, 1);
+      m.elevation = from + (elevation - from) * k;
+      m.jumpY = 4 * arc * k * (1 - k);
+      return k >= 1;
+    },
+    end: (m) => {
+      m.elevation = elevation;
+      m.jumpY = 0;
+      m.setPose('idle');
+    },
+  };
+}
+
 /** Runs `fn` once, immediately. */
 export function instant(name: string, fn: (m: ClawdModel) => void): Action {
   return { name, update: (m) => (fn(m), true) };

@@ -13,7 +13,7 @@ export class ClawdView {
     const s = m.stage.scale;
     const dev = Math.max(1, Math.round(s * b.metrics.dpr));
     const left = m.x - (BODY_W * s) / 2;
-    const top = m.stage.groundY - m.jumpY - BODY_H * s;
+    const top = m.feetY() - BODY_H * s;
     const frame = POSES[m.pose].frames[m.frameIndex()]!;
     const flip = m.facing === -1;
     const mirror = (lx: number, w: number) => (flip ? BODY_W - lx - w : lx);

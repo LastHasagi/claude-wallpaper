@@ -14,6 +14,13 @@ describe('AsciiGrid', () => {
     expect(g.toString()).toBe('    \n    ');
   });
 
+  it('floors fractional coordinates instead of silently dropping writes', () => {
+    const g = new AsciiGrid(4, 3);
+    g.set(1.7, 1.2, 'x', 'mid');
+    expect(g.get(1, 1)).toEqual({ ch: 'x', role: 'mid' });
+    expect(g.get(1.9, 1.9)?.ch).toBe('x');
+  });
+
   it('writes text with a role and clips at the edge', () => {
     const g = new AsciiGrid(5, 1);
     g.text(2, 0, 'abcd', 'accent');
