@@ -28,6 +28,30 @@ npm run e2e          # build de produção + Edge/Chrome: matriz de missões, cl
 | `seed=S` | Cenários e sorteios reproduzíveis |
 | `debug=1` | Painel com FPS, tempos e estados. Teclas: **M** missão, **N** bilhete, **T** tema, **L** idioma |
 
+## App desktop (Tauri)
+
+```bash
+npm run tauri dev     # app com recarga a quente (precisa do Rust instalado)
+npm run tauri build   # instaladores em src-tauri/target/release/bundle/ (NSIS .exe e .msi no Windows)
+npm run icon          # regenera os ícones a partir do sprite do Clawd
+```
+
+Na primeira execução aparece a tela de boas-vindas para escolher o modo. Depois disso, tudo fica no ícone da bandeja (mostrar/esconder, modos, configurações e sair).
+
+| Modo | Como funciona |
+|---|---|
+| **Pet solto** | Janela transparente do tamanho da área de trabalho, sempre por cima. Os cliques atravessam, exceto sobre o Clawd e o bilhete (o cursor é consultado ~30 vezes por segundo). |
+| **Terrário** | Janela pequena sem bordas. Arraste pela faixa do topo, onde fica a ⚙ para as configurações. Posição e tamanho são salvos. |
+| **Papel de parede** | **Windows:** anexada atrás dos ícones (técnica WorkerW, compatível com o layout do Windows 11 24H2+). **macOS/Linux:** tela cheia "sempre por baixo" (alternativa, ainda não testada nesses sistemas). |
+
+Linha de comando: `clawd-pet --mode overlay|terrarium|wallpaper`. Com o app já aberto, isso só troca o modo da instância em execução.
+
+O config do app fica em `%APPDATA%\dev.clawdpet.app\config.json` (Windows). As preferências do motor ficam no armazenamento local do WebView.
+
+**Compilação para macOS e Linux:** o workflow `.github/workflows/build.yml` gera os instaladores das 3 plataformas no GitHub Actions (ao criar uma tag `v*` ou manualmente) e não publica nada sozinho.
+
+**Limitações conhecidas:** só o monitor principal; no modo papel de parede o Clawd não recebe cliques (quem recebe é a área de trabalho), mas os olhos seguem o cursor e ele acena; com a barra de tarefas em ocultar automaticamente, o pet solto anda rente à borda inferior.
+
 ## Arquitetura
 
 Organizada por feature, com MVC dentro de cada uma. As features só conversam pelo `index.ts` umas das outras ou pelo `EventBus`, e um teste de arquitetura (`tests/architecture.test.ts`) garante isso.

@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "e2e": "node scripts/e2e-shots.mjs"
+    "e2e": "node scripts/e2e-shots.mjs",
+    "tauri": "tauri",
+    "icon": "node scripts/make-icon.mjs artifacts/icon.png && tauri icon artifacts/icon.png"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.3",
