@@ -7,6 +7,7 @@ import { LocalStorage } from '../host/local-storage';
 import { portrait } from '../features/clawd';
 import { SettingsController, type Settings, type SettingsEvents } from '../features/settings';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { asciiBar } from '../desktop/updates';
 import { AUTHOR_LINKS, MODE_ART, STRINGS, type NativeMode } from './strings';
 
 interface AppConfig {
@@ -30,6 +31,12 @@ interface UpdateInfo {
   url: string;
 }
 
+/** Sent by the native side while it installs a new version. */
+interface UpdateProgress {
+  phase: 'download' | 'install' | 'failed';
+  percent: number | null;
+}
+
 const ALL_MONITORS = 'all';
 const inTauri = '__TAURI_INTERNALS__' in window;
 /** Only Windows lets Clawd swap the system pointer (the browser preview shows everything). */
@@ -44,7 +51,7 @@ const settings = new SettingsController(new LocalStorage(), bus, {
 });
 
 // In a plain browser (development preview) the native calls are skipped; URL params simulate them:
-// ?welcome  ?monitors=2  ?update=0.3.0  ?ask=monitor
+// ?welcome  ?monitors=2  ?update=0.3.0  ?updating=42|install|failed  ?ask=monitor
 const config: AppConfig = inTauri
   ? await invoke<AppConfig>('get_config')
   : { mode: params.has('monitors') ? 'wallpaper' : 'overlay', onboarded: !params.has('welcome'), terrariumOnTop: true, wallpaperMonitor: null, checkUpdates: true };
@@ -57,10 +64,19 @@ let update: UpdateInfo | null = inTauri
   ? await invoke<UpdateInfo | null>('get_update').catch(() => null)
   : params.has('update') ? { version: params.get('update')!, url: '' } : null;
 let askMonitor = params.get('ask') === 'monitor';
+const previewProgress = params.get('updating');
+let progress: UpdateProgress | null =
+  previewProgress === null ? null
+  : previewProgress === 'install' || previewProgress === 'failed' ? { phase: previewProgress, percent: null }
+  : { phase: 'download', percent: Number(previewProgress) };
 
 if (inTauri) {
   void listen<UpdateInfo>('update-available', (e) => {
     update = e.payload;
+    render();
+  });
+  void listen<UpdateProgress>('update-progress', (e) => {
+    progress = e.payload;
     render();
   });
   // A monitor was plugged in / removed (or switched between Duplicate and Extend).
@@ -114,10 +130,21 @@ function renderMonitors(s: (typeof STRINGS)['pt']): void {
 }
 
 function renderUpdate(s: (typeof STRINGS)['pt']): void {
-  $('update').hidden = !update;
-  if (!update) return;
-  $('update-text').textContent = s.updateAvailable(update.version);
-  $('update-btn').textContent = s.download;
+  $('update').hidden = !update && !progress;
+  if ($('update').hidden) return;
+  const version = update?.version ?? '';
+  const busy = progress?.phase === 'download' || progress?.phase === 'install';
+  $('update-text').textContent =
+    progress?.phase === 'download' ? s.downloading(version)
+    : progress?.phase === 'install' ? s.installing
+    : progress?.phase === 'failed' ? s.updateFailed
+    : s.updateAvailable(version);
+  $('update-bar').hidden = progress?.phase !== 'download';
+  $('update-bar').textContent = asciiBar(progress?.percent ?? null);
+  $('update-notes').textContent = s.whatsNew;
+  $('update-notes').hidden = busy || progress?.phase === 'failed';
+  $('update-btn').hidden = busy;
+  $('update-btn').textContent = progress?.phase === 'failed' ? s.download : s.updateNow;
 }
 
 type RowKey = Exclude<keyof Settings, never>;
@@ -293,8 +320,18 @@ $('start').addEventListener('click', async () => {
   await invoke('finish_onboarding', { mode: chosenMode }).catch(console.error);
 });
 $('update-btn').addEventListener('click', () => {
-  if (inTauri) void invoke('open_update_page').catch(console.error);
+  if (!inTauri) return;
+  if (progress?.phase === 'failed') {
+    void invoke('open_update_page').catch(console.error);
+    return;
+  }
+  progress = { phase: 'download', percent: null };
+  render();
+  void invoke('install_update').catch(console.error);
 });
+const openNotes = () => inTauri && void invoke('open_update_page').catch(console.error);
+$('update-notes').addEventListener('click', openNotes);
+$('update-notes').addEventListener('keydown', (e) => e.key === 'Enter' && openNotes());
 bus.on('settings:changed', render);
 drawMascot();
 render();

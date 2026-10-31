@@ -18,6 +18,11 @@ const pt = {
   monitorName: (n: number, primary: boolean, w: number, h: number) => `Monitor ${n}${primary ? ' (principal)' : ''} · ${w}×${h}`,
   updateAvailable: (v: string) => `Nova versão ${v} disponível!`,
   download: 'Baixar',
+  updateNow: 'Atualizar agora',
+  whatsNew: 'o que mudou',
+  downloading: (v: string) => `Baixando a versão ${v}`,
+  installing: 'Instalando… o Clawd já volta.',
+  updateFailed: 'Não deu para atualizar por aqui. Baixe pela página:',
   modes: {
     overlay: ['Pet solto', 'Anda por cima de tudo, acima da barra de tarefas. Os cliques atravessam.'],
     terrarium: ['Terrário', 'Uma janelinha com o cenário completo. Arraste pelo topo.'],
@@ -49,6 +54,11 @@ const en: typeof pt = {
   monitorName: (n: number, primary: boolean, w: number, h: number) => `Monitor ${n}${primary ? ' (main)' : ''} · ${w}×${h}`,
   updateAvailable: (v: string) => `Version ${v} is available!`,
   download: 'Download',
+  updateNow: 'Update now',
+  whatsNew: "what's new",
+  downloading: (v: string) => `Downloading version ${v}`,
+  installing: 'Installing… Clawd will be right back.',
+  updateFailed: "Couldn't update from here. Get it from the page:",
   modes: {
     overlay: ['Free-roaming pet', 'Walks on top of everything, above the taskbar. Clicks go through.'],
     terrarium: ['Terrarium', 'A small window with the full scene. Drag it by the top edge.'],

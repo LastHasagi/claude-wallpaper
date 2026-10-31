@@ -1,5 +1,6 @@
 # Publishes a GitHub Release with installers for Windows, macOS and Linux.
 #
+# Needs the TAURI_SIGNING_PRIVATE_KEY secret (updater signing key, kept outside the repo).
 # To release: bump "version" in src-tauri/tauri.conf.json (and package.json), add a "## vX.Y.Z"
 # section to CHANGELOG.md (it becomes the release text), commit, then
 #   git tag v0.2.0 && git push origin v0.2.0
@@ -80,6 +81,9 @@ jobs:
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs the installers so the app can update itself (the public key is in tauri.conf.json).
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Clawd Pet ${{ github.ref_name }}
@@ -87,3 +91,6 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
           releaseBody: ${{ needs.test.outputs.notes }}
+          # latest.json (what the in-app updater reads) points Windows at the NSIS installer, the
+          # one people install with; the MSI would install a second copy per machine.
+          updaterJsonPreferNsis: true

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findUpdate, isNewer, parseVersion, RELEASES_PAGE } from '../../src/desktop/updates';
+import { asciiBar, findUpdate, isNewer, parseVersion, RELEASES_PAGE } from '../../src/desktop/updates';
 
 const reply = (body: unknown, ok = true) =>
   (async () => ({ ok, json: async () => body })) as unknown as typeof fetch;
@@ -36,5 +36,17 @@ describe('findUpdate', () => {
   it('never trusts a foreign URL from the response', async () => {
     const u = await findUpdate('0.2.0', reply({ tag_name: 'v0.3.0', html_url: 'https://evil.example/download' }));
     expect(u).toEqual({ version: '0.3.0', url: RELEASES_PAGE });
+  });
+});
+
+describe('asciiBar', () => {
+  it('fills in proportion and clamps', () => {
+    expect(asciiBar(0, 4)).toBe('[░░░░] 0%');
+    expect(asciiBar(50, 4)).toBe('[██░░] 50%');
+    expect(asciiBar(140, 4)).toBe('[████] 100%');
+  });
+
+  it('shows an empty bar while the size is unknown', () => {
+    expect(asciiBar(null, 4)).toBe('[░░░░] …');
   });
 });

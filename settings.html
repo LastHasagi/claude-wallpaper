@@ -40,6 +40,8 @@
       footer small a:hover, footer small a:focus-visible { text-decoration: underline; }
       #update { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: -6px 0 14px; padding: 8px 12px; border-radius: 8px; background: var(--paper); border: 1px solid var(--accent); }
       #update span { color: var(--ink); }
+      #update a { color: var(--mid); font-size: 12px; cursor: pointer; margin-left: auto; text-decoration: underline; }
+      #update pre { margin: 4px 0 0; color: var(--accent); font: inherit; white-space: pre; }
       .small-btn { all: unset; cursor: pointer; background: var(--accent); color: var(--bg); font-weight: 700; padding: 4px 12px; border-radius: 5px; font-size: 12.5px; }
       #monitors { margin-top: 10px; padding: 10px; border-radius: 8px; border: 1px dashed var(--faint); }
       #monitors.ask { border: 1px solid var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
@@ -56,7 +58,10 @@
       <canvas id="mascot" width="36" height="22"></canvas>
       <div><h1 id="title"></h1><p id="subtitle"></p></div>
     </header>
-    <div id="update" hidden><span id="update-text"></span><button class="small-btn" id="update-btn"></button></div>
+    <div id="update" hidden aria-live="polite">
+      <div><span id="update-text"></span><pre id="update-bar" hidden></pre></div>
+      <a id="update-notes" tabindex="0" role="link"></a><button class="small-btn" id="update-btn"></button>
+    </div>
     <h2 id="mode-heading"></h2>
     <div class="modes" id="modes"></div>
     <div id="monitors" hidden><p id="monitors-q"></p><div class="choices" id="monitor-choices"></div></div>

@@ -32,11 +32,11 @@ async function watchForUpdates(): Promise<void> {
         id: `update-${u.version}`,
         topic: 'app',
         title: { pt: 'Novidade!', en: 'New version!' },
-        pt: `Saiu a versão ${u.version} do Clawd Pet! Clique aqui para ver as novidades e baixar.`,
-        en: `Clawd Pet ${u.version} is out! Click here to see what's new and download it.`,
-        cta: { pt: 'clique para abrir a página', en: 'click to open the page' },
+        pt: `Saiu a versão ${u.version} do Clawd Pet! Clique aqui que eu me atualizo sozinho.`,
+        en: `Clawd Pet ${u.version} is out! Click here and I'll update myself.`,
+        cta: { pt: 'clique para atualizar', en: 'click to update' },
       },
-      () => void invoke('open_update_page').catch(() => {}),
+      () => void invoke('install_update').catch(() => {}),
     );
   });
 }

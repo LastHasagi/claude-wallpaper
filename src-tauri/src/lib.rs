@@ -34,6 +34,8 @@ struct AppState {
     pet_lock: Mutex<()>,
     /// Newer release found by the update check (the pet window runs it).
     update: Mutex<Option<UpdateInfo>>,
+    /// An update is being downloaded / installed.
+    updating: AtomicBool,
     /// Set by the monitor watcher: rebuild the pet even if its signature did not change.
     force_rebuild: AtomicBool,
     /// Clawd's mouse pointers (Windows): stored files and "swapped" marker.
@@ -46,6 +48,13 @@ struct AppState {
 struct UpdateInfo {
     version: String,
     url: String,
+}
+
+/// `update-progress` event: "download" (with a percent once the size is known), "install", "failed".
+#[derive(Clone, Debug, serde::Serialize)]
+struct UpdateProgress {
+    phase: &'static str,
+    percent: Option<u8>,
 }
 
 /// Only release pages of this project may be opened from update notices.
@@ -257,7 +266,10 @@ fn on_menu(app: &AppHandle, event: MenuEvent) {
         "mode-terrarium" => spawn_task(app, |a| apply_mode(a, Mode::Terrarium)),
         "mode-wallpaper" => spawn_task(app, wallpaper_from_tray),
         "settings" => spawn_task(app, open_settings),
-        "update" => open_update(app),
+        "update" => {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move { install_update(app).await });
+        }
         "cursor-steal" => cursor_command(app, "steal"),
         "cursor-return" => cursor_command(app, "return"),
         "belly-spit" => spit_icons(app),
@@ -581,6 +593,68 @@ fn open_update(app: &AppHandle) {
     }
 }
 
+/// Downloads the signed installer of the newest release, reports progress to the settings window
+/// (opened so it shows) and installs it; the app then starts again on the new version. Anything
+/// off (offline, a release without a signed build) falls back to the release page.
+#[tauri::command]
+async fn install_update(app: AppHandle) {
+    if state(&app).updating.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    if let Err(e) = open_settings(&app) {
+        eprintln!("[clawd] {e}");
+    }
+    if let Err(e) = download_and_install(&app).await {
+        eprintln!("[clawd] update failed: {e}");
+        state(&app).updating.store(false, Ordering::SeqCst);
+        let _ = app.emit("update-progress", UpdateProgress { phase: "failed", percent: None });
+        open_update(&app);
+    }
+}
+
+async fn download_and_install(app: &AppHandle) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+    // On Windows the installer takes over and the process exits without the usual exit event.
+    let handle = app.clone();
+    let updater = app
+        .updater_builder()
+        .on_before_exit(move || before_restart(&handle))
+        .build()
+        .map_err(err)?;
+    let update = updater
+        .check()
+        .await
+        .map_err(err)?
+        .ok_or("no signed update published for this release")?;
+    let (progress, done) = (app.clone(), app.clone());
+    let (mut got, mut shown) = (0u64, None);
+    update
+        .download_and_install(
+            move |chunk, total| {
+                got += chunk as u64;
+                let percent = total.map(|t| (got * 100 / t.max(1)).min(100) as u8);
+                if percent != shown {
+                    shown = percent;
+                    let _ = progress.emit("update-progress", UpdateProgress { phase: "download", percent });
+                }
+            },
+            move || {
+                let _ = done.emit("update-progress", UpdateProgress { phase: "install", percent: None });
+            },
+        )
+        .await
+        .map_err(err)?;
+    before_restart(app);
+    app.restart();
+}
+
+/// Same as quitting: Clawd gives everything back and the config is saved.
+fn before_restart(app: &AppHandle) {
+    give_everything_back(&state(app));
+    remember_terrarium(app);
+    state(app).update(true, |_| {});
+}
+
 // --- Commands ---------------------------------------------------------------------------------
 
 #[tauri::command]
@@ -806,6 +880,8 @@ pub fn run() {
     tauri::Builder::default()
         // Opens the author's links (GitHub, LinkedIn) from the settings window; scoped in capabilities.
         .plugin(tauri_plugin_opener::init())
+        // Installs new versions from inside the app (signed installers from the GitHub release).
+        .plugin(tauri_plugin_updater::Builder::new().build())
         // Launching again either switches mode (`--mode terrarium`) or brings up the settings.
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if argv.iter().any(|a| a == config::RESTORE_ALL) {
@@ -840,6 +916,7 @@ pub fn run() {
                 pet_seq: AtomicU32::new(1),
                 pet_lock: Mutex::new(()),
                 update: Mutex::new(None),
+                updating: AtomicBool::new(false),
                 force_rebuild: AtomicBool::new(false),
                 cursors,
                 belly,
@@ -893,6 +970,7 @@ pub fn run() {
             set_update_available,
             get_update,
             open_update_page,
+            install_update,
             cursor_store,
             cursor_hide,
             cursor_apply,

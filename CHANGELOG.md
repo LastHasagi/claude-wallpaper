@@ -3,6 +3,19 @@
 O que mudou em cada versão do Clawd Pet. A release de cada tag publica a seção correspondente
 (`scripts/release-notes.mjs`), e a pipeline falha se a versão não tiver entrada aqui.
 
+## v0.5.0 — 2026-10-31
+
+### Novo
+- **Atualização por dentro do app.** Quando sai uma versão nova, o botão **Atualizar agora** (nas configurações, na bandeja ou no bilhete do Clawd) baixa e instala sozinho, com uma barrinha de progresso em ASCII, e o Clawd volta já na versão nova. Nada de abrir o navegador.
+- O link **o que mudou** ainda leva à página da versão, para quem quiser ler as novidades.
+
+### Segurança
+- O instalador baixado é assinado; o app recusa qualquer arquivo cuja assinatura não confira.
+- Antes de instalar, o Clawd devolve o cursor e os ícones que estiverem com ele.
+
+### Observação
+- Quem está na v0.4.1 ou anterior precisa baixar esta versão pela página uma última vez. Daqui em diante, as atualizações são pelo próprio app.
+
 ## v0.4.1 — 2026-10-31
 
 ### Corrigido

@@ -56,3 +56,11 @@ export function startUpdateChecks(current: string, onUpdate: (u: UpdateInfo) => 
     clearInterval(every);
   };
 }
+
+/** "[██████░░░░] 42%": the scene is ASCII art, so is the progress bar. */
+export function asciiBar(percent: number | null, width = 24): string {
+  if (percent === null) return `[${'░'.repeat(width)}] …`;
+  const p = Math.max(0, Math.min(100, Math.round(percent)));
+  const full = Math.round((p / 100) * width);
+  return `[${'█'.repeat(full)}${'░'.repeat(width - full)}] ${p}%`;
+}
