@@ -6,9 +6,10 @@ use config::{AppConfig, Geometry, Mode, PxRect};
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicU32, Ordering},
+        atomic::{AtomicBool, AtomicU32, Ordering},
         Mutex,
     },
+    time::Duration,
 };
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem},
@@ -31,6 +32,8 @@ struct AppState {
     pet_lock: Mutex<()>,
     /// Newer release found by the update check (the pet window runs it).
     update: Mutex<Option<UpdateInfo>>,
+    /// Set by the monitor watcher: rebuild the pet even if its signature did not change.
+    force_rebuild: AtomicBool,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -41,6 +44,7 @@ struct UpdateInfo {
 
 /// Only release pages of this project may be opened from update notices.
 const RELEASES_URL: &str = "https://github.com/LastHasagi/claude-wallpaper/releases";
+const MONITOR_POLL: Duration = Duration::from_secs(3);
 
 #[derive(Clone, Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -278,7 +282,8 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
         .expect("pet label lock")
         .as_ref()
         .map(|(_, sig)| sig.clone());
-    if let (Some(win), Some(sig)) = (current_pet(app), built) {
+    let forced = st.force_rebuild.swap(false, Ordering::Relaxed);
+    if let (false, Some(win), Some(sig)) = (forced, current_pet(app), built) {
         if sig == pet_signature(&cfg) {
             if !cfg.hidden {
                 win.show().map_err(err)?;
@@ -377,6 +382,13 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
         Mode::Wallpaper => {
             // No click-through here: it makes the window layered, and a layered *child* window
             // is never drawn. The icons layer above already takes the mouse.
+            // Physical px: with monitors at different scales (4K @150% + Full HD @100%) a logical
+            // size converted with one monitor's scale is wrong for the whole span.
+            let s = wall.span;
+            win.set_position(tauri::PhysicalPosition::new(s.x, s.y))
+                .map_err(err)?;
+            win.set_size(tauri::PhysicalSize::new(s.w as u32, s.h as u32))
+                .map_err(err)?;
             win.set_always_on_top(false).map_err(err)?;
             #[cfg(windows)]
             {
@@ -492,6 +504,47 @@ fn open_update(app: &AppHandle) {
 
 #[tauri::command]
 fn list_monitors(app: AppHandle) -> Result<Vec<MonitorInfo>, String> {
+    monitor_list(&app)
+}
+
+/// Every few seconds, notices monitors being plugged in/out (or Duplicate ↔ Extend): tells the
+/// settings window, rebuilds the wallpaper for the new layout and asks "which monitor?" when a
+/// second one shows up and no choice was made yet.
+fn watch_monitors(app: AppHandle) {
+    std::thread::spawn(move || {
+        let layout = |list: &[MonitorInfo]| {
+            list.iter()
+                .map(|m| (m.x, m.y, m.width, m.height))
+                .collect::<Vec<_>>()
+        };
+        let mut last = monitor_list(&app).map(|l| layout(&l)).unwrap_or_default();
+        loop {
+            std::thread::sleep(MONITOR_POLL);
+            let Ok(list) = monitor_list(&app) else {
+                continue;
+            };
+            let now = layout(&list);
+            if now == last {
+                continue;
+            }
+            eprintln!("[clawd] monitors changed: {} → {}", last.len(), now.len());
+            let gained_one = now.len() > last.len();
+            last = now;
+            let _ = app.emit("monitors-changed", &list);
+            let cfg = state(&app).snapshot();
+            if !cfg.onboarded || cfg.mode != Mode::Wallpaper {
+                continue;
+            }
+            state(&app).force_rebuild.store(true, Ordering::Relaxed);
+            spawn_task(&app, open_pet);
+            if gained_one && list.len() > 1 && cfg.wallpaper_monitor.is_none() {
+                spawn_task(&app, |a| open_settings_asking(a, true));
+            }
+        }
+    });
+}
+
+fn monitor_list(app: &AppHandle) -> Result<Vec<MonitorInfo>, String> {
     let primary = app.primary_monitor().map_err(err)?.map(|m| px_rect(&m));
     let mut list: Vec<MonitorInfo> = app
         .available_monitors()
@@ -637,6 +690,7 @@ pub fn run() {
                 pet_seq: AtomicU32::new(1),
                 pet_lock: Mutex::new(()),
                 update: Mutex::new(None),
+                force_rebuild: AtomicBool::new(false),
             });
 
             let handle = app.handle().clone();
@@ -659,6 +713,7 @@ pub fn run() {
                 tray = tray.icon(icon.clone());
             }
             tray.build(app)?;
+            watch_monitors(handle.clone());
 
             if cfg.onboarded {
                 open_pet(&handle)?;

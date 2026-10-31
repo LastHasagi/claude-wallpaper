@@ -4,6 +4,7 @@ import { createRng } from '../../src/shared/rng';
 import { fixedClock } from '../../src/shared/time';
 import { parsePropArt } from '../../src/shared/render/prop-art';
 import { parseSegments } from '../../src/host/segments';
+import { cellWidthFor } from '../../src/shared/render/canvas-backend';
 import { ClawdController, type ClawdEvents } from '../../src/features/clawd';
 import { ClawdModel } from '../../src/features/clawd/model/clawd-model';
 import { SceneController } from '../../src/features/scene';
@@ -18,6 +19,20 @@ const SEGMENTS = [
   { x: 1920, y: 0, w: 1280, h: 720 },
 ];
 const COLS = 320, ROWS = 54;
+
+describe('cell size across monitors', () => {
+  it('keeps the single-screen rule', () => {
+    expect(cellWidthFor(1920)).toBeCloseTo(9.6, 5);
+    expect(cellWidthFor(1280)).toBeCloseTo(1280 / 142, 5);
+  });
+
+  it('sizes cells per monitor, not per span (real case: 4K @150% left of Full HD, DPR 1.5)', () => {
+    // CSS px of the span window: 2560 (4K) + 1280 (Full HD) = 3840.
+    const w = cellWidthFor(3840, [2560, 1280]);
+    expect(w).toBeLessThan(9.1); // was 19.2 with the whole span capped at 200 columns
+    expect(Math.round(3840 / w)).toBeGreaterThan(400);
+  });
+});
 
 describe('parseSegments', () => {
   it('parses, scales and sorts left to right', () => {

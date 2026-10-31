@@ -12,6 +12,8 @@ const pt = {
   start: 'Começar',
   credit: 'Feito por Rodrigo Graça',
   monitorQuestion: 'Em qual monitor? Você tem mais de um.',
+  monitorOnlyOne: (w: number, h: number) =>
+    `Só 1 monitor detectado (${w}×${h}). Tem outro ligado? Se ele estiver duplicando esta tela, aperte Win+P → Estender: ele aparece aqui na hora.`,
   monitorAll: 'Todos (o Clawd passeia de um para o outro)',
   monitorName: (n: number, primary: boolean, w: number, h: number) => `Monitor ${n}${primary ? ' (principal)' : ''} · ${w}×${h}`,
   updateAvailable: (v: string) => `Nova versão ${v} disponível!`,
@@ -41,6 +43,8 @@ const en: typeof pt = {
   start: 'Start',
   credit: 'Made by Rodrigo Graça',
   monitorQuestion: 'Which monitor? You have more than one.',
+  monitorOnlyOne: (w: number, h: number) =>
+    `Only 1 monitor detected (${w}×${h}). Got another one plugged in? If it mirrors this screen, press Win+P → Extend: it shows up here right away.`,
   monitorAll: 'All of them (Clawd walks from one to the other)',
   monitorName: (n: number, primary: boolean, w: number, h: number) => `Monitor ${n}${primary ? ' (main)' : ''} · ${w}×${h}`,
   updateAvailable: (v: string) => `Version ${v} is available!`,

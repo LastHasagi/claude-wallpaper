@@ -23,6 +23,16 @@ export function columnsFor(cssW: number): number {
 }
 
 /**
+ * Cell width for a viewport. A window spanning several monitors must size cells per monitor:
+ * capping the *whole* span at 200 columns made every glyph 2–3× too big (4K + Full HD case).
+ * With monitors of different widths the finest monitor wins, so none of them looks blown up.
+ */
+export function cellWidthFor(cssW: number, segmentWidths: readonly number[] = []): number {
+  const widths = segmentWidths.length > 1 ? segmentWidths : [cssW];
+  return Math.min(...widths.map((w) => w / columnsFor(w)));
+}
+
+/**
  * Two stacked canvases: `bg` holds the ASCII grid and is redrawn incrementally (only changed
  * cells), `fg` holds sprites/UI and is cleared every frame. All drawing snaps to device pixels.
  */
@@ -60,8 +70,8 @@ export class CanvasBackend {
     return this.theme.colors[role];
   }
 
-  resize(cssW: number, cssH: number, dpr: number): GridMetrics {
-    const cols = columnsFor(cssW);
+  resize(cssW: number, cssH: number, dpr: number, segmentWidths: readonly number[] = []): GridMetrics {
+    const cols = Math.max(1, Math.round(cssW / cellWidthFor(cssW, segmentWidths)));
     const cellW = cssW / cols;
     const fontPx = cellW / this.charRatio;
     const cellH = fontPx * 1.18;

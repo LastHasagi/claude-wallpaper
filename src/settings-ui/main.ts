@@ -48,7 +48,7 @@ const config: AppConfig = inTauri
   : { mode: params.has('monitors') ? 'wallpaper' : 'overlay', onboarded: !params.has('welcome'), terrariumOnTop: true, wallpaperMonitor: null, checkUpdates: true };
 let chosenMode: NativeMode = config.mode;
 let autostart = inTauri ? await isEnabled().catch(() => false) : false;
-const monitors: MonitorInfo[] = inTauri
+let monitors: MonitorInfo[] = inTauri
   ? await invoke<MonitorInfo[]>('list_monitors').catch(() => [])
   : Array.from({ length: Number(params.get('monitors') ?? 1) }, (_, i) => ({ id: `DISPLAY${i + 1}`, width: i ? 2560 : 1920, height: i ? 1440 : 1080, primary: i === 0 }));
 let update: UpdateInfo | null = inTauri
@@ -59,6 +59,11 @@ let askMonitor = params.get('ask') === 'monitor';
 if (inTauri) {
   void listen<UpdateInfo>('update-available', (e) => {
     update = e.payload;
+    render();
+  });
+  // A monitor was plugged in / removed (or switched between Duplicate and Extend).
+  void listen<MonitorInfo[]>('monitors-changed', (e) => {
+    monitors = e.payload;
     render();
   });
   void listen('ask-monitor', () => {
@@ -78,8 +83,16 @@ async function chooseMonitor(target: string): Promise<void> {
 
 function renderMonitors(s: (typeof STRINGS)['pt']): void {
   const box = $('monitors');
-  box.hidden = !(chosenMode === 'wallpaper' && monitors.length > 1);
+  box.hidden = chosenMode !== 'wallpaper';
   if (box.hidden) return;
+  if (monitors.length <= 1) {
+    // Say so instead of silently skipping the question (a mirrored second screen counts as one).
+    const m = monitors[0];
+    box.classList.remove('ask');
+    $('monitors-q').textContent = s.monitorOnlyOne(m?.width ?? 0, m?.height ?? 0);
+    $('monitor-choices').replaceChildren();
+    return;
+  }
   box.classList.toggle('ask', askMonitor || config.wallpaperMonitor === null);
   $('monitors-q').textContent = s.monitorQuestion;
   const options = [

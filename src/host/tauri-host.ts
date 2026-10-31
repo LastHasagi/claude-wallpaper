@@ -27,13 +27,15 @@ export class TauriHost implements HostAdapter {
   private lastLocal: Point | null = null;
   private lang: Lang | null = null;
 
-  private readonly segmentRects: Rect[];
+  /** Monitors in physical px; converted with the *current* DPR (it can change after the window is
+   *  moved behind the desktop icons, so it must not be frozen at startup). */
+  private readonly segmentsRaw: string | null;
 
   constructor(params: URLSearchParams, private readonly win: Window = window) {
     const m = params.get('mode');
     this.nativeMode = m === 'terrarium' || m === 'wallpaper' ? m : 'overlay';
     // The native side passes the covered monitors in physical px relative to the window.
-    this.segmentRects = parseSegments(params.get('segments'), win.devicePixelRatio || 1);
+    this.segmentsRaw = params.get('segments');
     this.mode = this.nativeMode === 'overlay' ? 'overlay' : 'full';
     this.cursor = { subscribe: (fn) => this.subscribe(fn) };
     if (this.nativeMode === 'terrarium') this.addTerrariumChrome();
@@ -44,7 +46,7 @@ export class TauriHost implements HostAdapter {
   }
 
   segments(): Rect[] {
-    return this.segmentRects;
+    return parseSegments(this.segmentsRaw, this.win.devicePixelRatio || 1);
   }
 
   setInteractiveRects(rects: Rect[]): void {

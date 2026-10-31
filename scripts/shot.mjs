@@ -20,7 +20,8 @@ async function launch() {
 }
 
 const browser = await launch();
-const page = await browser.newPage({ viewport: { width: Number(width), height: Number(height) } });
+// DPR env var emulates a scaled display (e.g. DPR=1.5 for a 4K monitor at 150%).
+const page = await browser.newPage({ viewport: { width: Number(width), height: Number(height) }, deviceScaleFactor: Number(process.env.DPR ?? 1) });
 const errors = [];
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 page.on('pageerror', (e) => errors.push(String(e)));

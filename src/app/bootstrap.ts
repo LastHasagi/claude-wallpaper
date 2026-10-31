@@ -71,8 +71,9 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
   }
 
   function layout(): void {
-    const m = backend.resize(win.innerWidth, win.innerHeight, win.devicePixelRatio || 1);
-    const l = scene.resize(m.cols, m.rows, m.cellW, m.cellH, m.cssH, host.groundInset(), host.segments?.() ?? []);
+    const segments = host.segments?.() ?? [];
+    const m = backend.resize(win.innerWidth, win.innerHeight, win.devicePixelRatio || 1, segments.map((s) => s.w));
+    const l = scene.resize(m.cols, m.rows, m.cellW, m.cellH, m.cssH, host.groundInset(), segments);
     const dev = Math.max(1, Math.round(((m.cellW * SIZE_CELLS[settings.get().size]) / 36) * m.dpr));
     const scale = dev / m.dpr;
     const margin = 18 * scale;
@@ -82,6 +83,14 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
   applyTheme();
   layout();
   win.addEventListener('resize', layout);
+  // The DPR can change without a resize (e.g. the window lands on a monitor with another scale).
+  const watchDpr = () => {
+    win.matchMedia?.(`(resolution: ${win.devicePixelRatio}dppx)`).addEventListener('change', () => {
+      layout();
+      watchDpr();
+    }, { once: true });
+  };
+  watchDpr();
 
   host.languageChanged?.(lang());
   host.onExternalSettings?.((patch) => settings.set(patch as Partial<Settings>));
