@@ -53,6 +53,14 @@ export class CanvasBackend {
     this.bgCtx.font = `100px ${MONO_FONT}`;
     this.charRatio = this.bgCtx.measureText('M').width / 100 || 0.55;
     this.setTheme(theme);
+    // The GPU can be taken away (a game resetting the device): the canvases come back blank, and
+    // `bg` only redraws changed cells, so the scene would vanish for good without a full repaint.
+    for (const c of [bg, fg]) c.addEventListener('contextrestored', () => this.repaintAll());
+  }
+
+  repaintAll(): void {
+    this.prev = null;
+    this.spriteCache = new WeakMap();
   }
 
   setTheme(theme: Theme): void {

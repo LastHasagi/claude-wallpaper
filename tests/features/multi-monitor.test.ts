@@ -3,7 +3,7 @@ import { EventBus } from '../../src/shared/events';
 import { createRng } from '../../src/shared/rng';
 import { fixedClock } from '../../src/shared/time';
 import { parsePropArt } from '../../src/shared/render/prop-art';
-import { parseSegments } from '../../src/host/segments';
+import { fitSegments, parseSegments } from '../../src/host/segments';
 import { cellWidthFor } from '../../src/shared/render/canvas-backend';
 import { ClawdController, type ClawdEvents } from '../../src/features/clawd';
 import { ClawdModel } from '../../src/features/clawd/model/clawd-model';
@@ -47,6 +47,29 @@ describe('parseSegments', () => {
     expect(parseSegments('1,2,3')).toEqual([]);
     expect(parseSegments('0,0,0,100')).toEqual([]);
     expect(parseSegments('a,b,c,d')).toEqual([]);
+  });
+});
+
+describe('fitSegments', () => {
+  // Real case: 4K @150% left of a Full HD @100% primary, physical px relative to the window.
+  const PHYSICAL = parseSegments('0,0,3840,2160;3840,0,1920,1080');
+
+  it('uses the ratio the page is really drawn at, not devicePixelRatio', () => {
+    // Behind the icons WebView2 reported DPR 1.5 with innerWidth 5760: 1 CSS px per physical px.
+    // Dividing by the DPR put the Full HD scene on the 4K and left the Full HD empty.
+    expect(fitSegments(PHYSICAL, 5760)).toEqual(PHYSICAL);
+  });
+
+  it('scales down when the page is drawn at 1.5', () => {
+    expect(fitSegments(PHYSICAL, 3840)).toEqual([
+      { x: 0, y: 0, w: 2560, h: 1440 },
+      { x: 2560, y: 0, w: 1280, h: 720 },
+    ]);
+  });
+
+  it('means a single screen without segments or a viewport', () => {
+    expect(fitSegments([], 1920)).toEqual([]);
+    expect(fitSegments(PHYSICAL, 0)).toEqual([]);
   });
 });
 

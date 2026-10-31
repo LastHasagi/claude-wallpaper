@@ -3,6 +3,7 @@ import { AsciiGrid } from '../../src/shared/render/ascii-grid';
 import { PALETTES, COLOR_ROLES } from '../../src/shared/render/roles';
 import { parsePropArt } from '../../src/shared/render/prop-art';
 import { parseSprite } from '../../src/shared/render/sprite';
+import { CanvasBackend } from '../../src/shared/render/canvas-backend';
 
 describe('AsciiGrid', () => {
   it('ignores out-of-bounds writes and reads', () => {
@@ -112,5 +113,26 @@ describe('parseSprite', () => {
   it('rejects unknown letters and ragged rows', () => {
     expect(() => parseSprite(['OX'], pal)).toThrow(/unknown/);
     expect(() => parseSprite(['OO', 'O'], pal)).toThrow(/width/);
+  });
+});
+
+describe('CanvasBackend', () => {
+  /** Canvas stand-in for the node test environment: events work, drawing is a no-op. */
+  function fakeCanvas(): HTMLCanvasElement {
+    const ctx = new Proxy({ measureText: () => ({ width: 55 }) }, { get: (t, k) => (t as Record<PropertyKey, unknown>)[k] ?? (() => {}), set: () => true });
+    return Object.assign(new EventTarget(), { width: 0, height: 0, style: {}, getContext: () => ctx }) as unknown as HTMLCanvasElement;
+  }
+
+  it('repaints the whole scene once the GPU gives the canvases back (game reset the device)', () => {
+    const bg = fakeCanvas();
+    const backend = new CanvasBackend(bg, fakeCanvas(), PALETTES.dark);
+    backend.resize(100, 40, 1);
+    const grid = new AsciiGrid(10, 2);
+    grid.set(1, 1, '_', 'mid');
+    grid.set(2, 1, '_', 'mid');
+    expect(backend.presentGrid(grid)).toBe(2);
+    expect(backend.presentGrid(grid)).toBe(0); // unchanged: nothing redrawn
+    bg.dispatchEvent(new Event('contextrestored'));
+    expect(backend.presentGrid(grid)).toBe(2);
   });
 });

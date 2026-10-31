@@ -3,6 +3,12 @@
 O que mudou em cada versão do Clawd Pet. A release de cada tag publica a seção correspondente
 (`scripts/release-notes.mjs`), e a pipeline falha se a versão não tiver entrada aqui.
 
+## v0.4.1 — 2026-10-31
+
+### Corrigido
+- Papel de parede em **Todos** com monitores de escalas diferentes (por exemplo, 4K a 150% e Full HD a 100%): o cenário do 4K ocupava só parte da tela, o do Full HD aparecia dentro do 4K e o Full HD ficava vazio. Agora cada monitor mostra o seu cenário inteiro, com o chão embaixo.
+- Depois de abrir um jogo (ou qualquer coisa que reinicie a placa de vídeo), o cenário do papel de parede e do terrário sumia e só sobravam as nuvens. Agora ele é redesenhado inteiro assim que a placa de vídeo volta.
+
 ## v0.4.0 — 2026-10-31
 
 ### Novo

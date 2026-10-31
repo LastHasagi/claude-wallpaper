@@ -9,7 +9,7 @@ import { cursorFile } from './cursor-files';
 import type { BellyPort, CursorCommand, CursorEvent, CursorSource, DisplayMode, EatReport, FileDrag, HostAdapter, SystemCursorPort } from './host';
 import { LocalStorage } from './local-storage';
 import { insideViewport, shouldCapture, toLocal } from './pointer';
-import { parseSegments } from './segments';
+import { fitSegments, parseSegments } from './segments';
 
 export type NativeMode = 'overlay' | 'terrarium' | 'wallpaper';
 
@@ -69,8 +69,8 @@ export class TauriHost implements HostAdapter {
   readonly systemCursor?: SystemCursorPort;
   readonly belly?: BellyPort;
 
-  /** Monitors in physical px; converted with the *current* DPR (it can change after the window is
-   *  moved behind the desktop icons, so it must not be frozen at startup). */
+  /** Monitors in physical px; converted on every layout with the window's current size (the scale
+   *  can change after the window is moved behind the desktop icons). */
   private readonly segmentsRaw: string | null;
 
   constructor(params: URLSearchParams, private readonly win: Window = window) {
@@ -92,7 +92,7 @@ export class TauriHost implements HostAdapter {
   }
 
   segments(): Rect[] {
-    return parseSegments(this.segmentsRaw, this.win.devicePixelRatio || 1);
+    return fitSegments(parseSegments(this.segmentsRaw), this.win.innerWidth);
   }
 
   setInteractiveRects(rects: Rect[]): void {
@@ -172,9 +172,10 @@ export class TauriHost implements HostAdapter {
       try {
         const now = performance.now();
         if (now - originAt > ORIGIN_REFRESH_MS) {
-          const [pos, s] = await Promise.all([appWin.innerPosition(), appWin.scaleFactor()]);
+          const [pos, size] = await Promise.all([appWin.innerPosition(), appWin.innerSize()]);
           origin = { x: pos.x, y: pos.y };
-          scale = s;
+          // Measured like the segments: the reported scale can disagree with how the page is drawn.
+          if (size.width > 0 && this.win.innerWidth > 0) scale = size.width / this.win.innerWidth;
           originAt = now;
         }
         const p = toLocal(await cursorPosition(), origin, scale);
