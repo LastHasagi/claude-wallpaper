@@ -1,3 +1,4 @@
+import type { CursorArt } from '../shared/cursor';
 import type { Rect } from '../shared/geometry';
 import type { Lang } from '../shared/i18n';
 
@@ -22,6 +23,21 @@ export interface HostStorage {
   set(key: string, value: string): void;
 }
 
+/** Asked from outside the engine (tray menu, command line). */
+export type CursorCommand = 'steal' | 'return';
+
+/** The system mouse pointer, where the platform lets an app swap it (Windows). */
+export interface SystemCursorPort {
+  /** Hides the pointer everywhere: Clawd has it in his mouth. */
+  hide(): Promise<void>;
+  /** Swaps the system pointers for these; any other pointer goes back to the user's own. */
+  apply(art: readonly CursorArt[]): Promise<void>;
+  /** Puts the user's own pointers back. */
+  restore(): Promise<void>;
+  /** Whether the pointer is where Clawd can see it (wallpaper mode: only over the desktop). */
+  visible(): Promise<boolean>;
+}
+
 /** Everything the engine needs from whoever embeds it (browser page, Tauri window, …). */
 export interface HostAdapter {
   readonly mode: DisplayMode;
@@ -44,4 +60,7 @@ export interface HostAdapter {
   onExternalSettings?(cb: (patch: Record<string, unknown>) => void): void;
   /** The engine's resolved language, so native UI (tray menu) can follow it. */
   languageChanged?(lang: Lang): void;
+  /** Absent where the system pointer can't be swapped (macOS, Linux). */
+  readonly systemCursor?: SystemCursorPort;
+  onCursorCommand?(cb: (cmd: CursorCommand) => void): void;
 }

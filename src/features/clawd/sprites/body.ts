@@ -9,7 +9,8 @@ export const FEET: Point = { x: BODY_W / 2, y: BODY_H };
 
 export type PoseName =
   | 'idle' | 'walk' | 'run' | 'sit' | 'sleep' | 'jump' | 'laugh' | 'dizzy'
-  | 'startle' | 'wave' | 'angry' | 'hold' | 'read' | 'type' | 'carry';
+  | 'startle' | 'wave' | 'angry' | 'hold' | 'read' | 'type' | 'carry'
+  | 'inhale' | 'chew' | 'gulp' | 'spit';
 
 export interface PoseFrame {
   sprite: Sprite;
@@ -35,7 +36,7 @@ interface Parts {
   dx?: number;
   /** Lowers the whole body (sitting / lying). */
   dy?: number;
-  /** Lowers only the top of the body (breathing, lying flat). */
+  /** Lowers only the top of the body (breathing, lying flat); negative stretches him up. */
   squash?: number;
 }
 
@@ -97,4 +98,9 @@ export const POSES: Record<PoseName, Pose> = {
   read: { fps: 1, frames: [stand({ legs: 'sit', dy: 2, armL: 'mid', armR: 'mid' })] },
   type: { fps: 9, frames: [stand({ legs: 'sit', dy: 2, armL: 'mid', armR: 'midLow' }), stand({ legs: 'sit', dy: 2, armL: 'midLow', armR: 'mid' })] },
   carry: { fps: 6, frames: [stand({ legs: 'stepA', armL: 'mid', armR: 'mid' }), stand({ legs: 'stepB', armL: 'mid', armR: 'mid' })] },
+  // Eating the user's pointer: stretches up sucking it in, chomps, squashes swallowing, spits.
+  inhale: { fps: 6, frames: [stand({ armL: 'up', armR: 'up', squash: -2 }), stand({ armL: 'up', armR: 'up', squash: -1 })] },
+  chew: { fps: 7, frames: [stand({ armL: 'midLow', armR: 'midLow', squash: 1 }), stand({ armL: 'midLow', armR: 'midLow' })] },
+  gulp: { fps: 1, frames: [stand({ legs: 'tuck', squash: 3 })] },
+  spit: { fps: 1, frames: [stand({ armL: 'down', armR: 'down', squash: -2 })] },
 };

@@ -6,6 +6,10 @@ Criado por **Rodrigo Graça** · [GitHub](https://github.com/LastHasagi) · [Lin
 
 ![Clawd observando pássaros, programando e cochilando num livro](docs/media/clawd-demo.gif)
 
+**Cuidado com o seu mouse (Windows):** se o ponteiro ficar parado perto dele, o Clawd pode engolir o ponteiro e cuspir o dele, com um cursor animado para cada ação (seta, link, texto, ocupado, carregando, proibido). Para pegar o seu de volta, clique nele (ou use "Devolver meu cursor" na bandeja). Ele também devolve sozinho depois de 10 minutos e sempre que o app fecha.
+
+![Os cursores do Clawd: seta, link, texto, ocupado, carregando e proibido, em fundo claro e escuro](docs/media/clawd-cursors.png)
+
 **Instalar:** baixe o instalador da sua plataforma em [Releases](https://github.com/LastHasagi/claude-wallpaper/releases) (Windows `.exe`/`.msi`, macOS `.dmg`, Linux `.AppImage`/`.deb`/`.rpm`). Os instaladores não são assinados. No Windows, o SmartScreen pode avisar: "Mais informações" → "Executar assim mesmo". No macOS, na primeira vez, clique com o botão direito no app → Abrir.
 
 ## Rodando
@@ -27,10 +31,11 @@ npm run e2e          # build de produção + Edge/Chrome: matriz de missões, cl
 | `mission=birdwatching\|coding\|reading-bench` | Começa direto nessa missão |
 | `theme=dark\|light`, `lang=pt\|en`, `size=S\|M\|L`, `fps=15\|30\|60` | Sobrescrevem as configurações |
 | `freq=often\|normal\|rare`, `notes=off\|sometimes\|always` | Frequência das missões e das curiosidades |
+| `cursor=off\|sometimes\|often` | Com que frequência ele rouba o ponteiro (no navegador, só o ponteiro da página muda) |
 | `speed=N` | Acelera o tempo |
 | `hour=H` | Força o horário (dia, entardecer, noite) |
 | `seed=S` | Cenários e sorteios reproduzíveis |
-| `debug=1` | Painel com FPS, tempos e estados. Teclas: **M** missão, **N** bilhete, **T** tema, **L** idioma |
+| `debug=1` | Painel com FPS, tempos e estados. Teclas: **M** missão, **N** bilhete, **T** tema, **L** idioma, **C** rouba/devolve o ponteiro |
 
 ## App desktop (Tauri)
 
@@ -48,7 +53,9 @@ Na primeira execução aparece a tela de boas-vindas para escolher o modo. Depoi
 | **Terrário** | Janela pequena sem bordas. Arraste pela faixa do topo, onde fica a ⚙ para as configurações. Posição e tamanho são salvos. |
 | **Papel de parede** | **Windows:** anexada atrás dos ícones (técnica WorkerW, compatível com o layout do Windows 11 24H2+). Com mais de um monitor, o app pergunta onde aplicar: em um monitor ou em **todos**. Em todos, cada monitor tem o próprio cenário e o próprio chão, e o Clawd passeia de um para o outro. **macOS/Linux:** tela cheia "sempre por baixo" (alternativa, ainda não testada nesses sistemas). |
 
-Linha de comando: `clawd-pet --mode overlay|terrarium|wallpaper`. Com o app já aberto, isso só troca o modo da instância em execução.
+Linha de comando: `clawd-pet --mode overlay|terrarium|wallpaper`. Com o app já aberto, isso só troca o modo da instância em execução. `clawd-pet --cursor steal|return` pede ao Clawd que roube o ponteiro ou o devolva.
+
+**O cursor do Clawd (Windows):** os arquivos `.ani` são gerados pelo motor a partir da arte em pixel (16×16, em 32/48/64/96 px para cada escala de tela) e ficam em `%LOCALAPPDATA%\dev.clawdpet.app\cursors\`. A troca usa `SetSystemCursor`; a devolução recarrega o esquema de ponteiros do próprio usuário (`SPI_SETCURSORS`), então nada dele é sobrescrito. Um marcador lembra a troca: se o app cair, o ponteiro original volta na próxima abertura (ou no logoff). No papel de parede, ele só rouba quando o ponteiro está sobre a área de trabalho. macOS e Linux não permitem trocar o ponteiro do sistema, então lá a opção não aparece. `node scripts/cursor-sheet.mjs` desenha todos os quadros num PNG.
 
 O config do app fica em `%APPDATA%\dev.clawdpet.app\config.json` (Windows). As preferências do motor ficam no armazenamento local do WebView.
 
@@ -74,12 +81,13 @@ Organizada por feature, com MVC dentro de cada uma. As features só conversam pe
 src/
   app/        composição (bootstrap), game loop com passo fixo, debug
   shared/     rng, eventos, i18n, hora do dia, render (AsciiGrid, CanvasBackend, sprites, paletas)
-  host/       HostAdapter (o contrato com quem embute o motor) + BrowserHost
+  host/       HostAdapter (o contrato com quem embute o motor), BrowserHost, TauriHost, arquivos .cur/.ani
   features/
     clawd/     personagem: sprites montados por partes, fila de ações, cérebro (reações + vida própria)
     scene/     biomas ASCII (montanhas, parque, quarto), céu por horário, props, efeitos, transições
     missions/  diretor de missões, contexto com cancelamento, terminal, catálogo das missões
     notes/     curiosidades PT/EN, sorteio sem repetição, entrega e dispensa do bilhete
+    cursor/    o Clawd engole o ponteiro e cospe o dele: regras, cena, arte dos cursores
     settings/  preferências validadas e persistidas
 ```
 

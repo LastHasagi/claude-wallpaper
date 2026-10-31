@@ -3,6 +3,20 @@
 O que mudou em cada versão do Clawd Pet. A release de cada tag publica a seção correspondente
 (`scripts/release-notes.mjs`), e a pipeline falha se a versão não tiver entrada aqui.
 
+## v0.3.0 — 2026-10-31
+
+### Novo
+- **O Clawd rouba o seu cursor (Windows).** Se o ponteiro do mouse ficar parado perto dele, ele pode engolir o ponteiro ("nhac!", "glup") e cuspir o dele. Há um cursor animado para cada ação: seta, link, texto, ocupado, carregando em segundo plano e proibido.
+- Para pegar o seu de volta, clique no Clawd ou use **Devolver meu cursor** na bandeja. Ele também devolve sozinho depois de 10 minutos, ao trocar de modo e quando o app fecha. Se o app fechar de repente, o cursor original volta na próxima abertura (ou no logoff).
+- Nova opção **Roubar o cursor** nas configurações: nunca, às vezes (padrão) ou frequentes. Na bandeja, **Clawd, pega meu cursor!** faz ele roubar na hora.
+- O Clawd ganhou boca: ela aparece quando ele puxa o ar, mastiga e cospe.
+- Linha de comando: `clawd-pet --cursor steal` e `clawd-pet --cursor return`.
+
+### Detalhes
+- No papel de parede, ele só rouba quando o ponteiro está sobre a área de trabalho, não sobre uma janela.
+- As missões esperam a cena terminar. Se você pedir o cursor de volta enquanto ele está numa missão, o cursor volta na hora.
+- O texto de cada release agora diz o que mudou naquela versão.
+
 ## v0.2.1 — 2026-10-30
 
 ### Corrigido

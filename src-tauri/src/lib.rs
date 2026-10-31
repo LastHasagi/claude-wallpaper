@@ -1,4 +1,5 @@
 mod config;
+mod cursors;
 #[cfg(windows)]
 mod desktop;
 
@@ -34,6 +35,8 @@ struct AppState {
     update: Mutex<Option<UpdateInfo>>,
     /// Set by the monitor watcher: rebuild the pet even if its signature did not change.
     force_rebuild: AtomicBool,
+    /// Clawd's mouse pointers (Windows): stored files and "swapped" marker.
+    cursors: cursors::Cursors,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -108,6 +111,8 @@ struct Labels {
     wallpaper: &'static str,
     settings: &'static str,
     quit: &'static str,
+    steal_cursor: &'static str,
+    return_cursor: &'static str,
 }
 
 fn labels(lang: &str) -> Labels {
@@ -119,6 +124,8 @@ fn labels(lang: &str) -> Labels {
             wallpaper: "Papel de parede",
             settings: "Configurações…",
             quit: "Sair",
+            steal_cursor: "🖱 Clawd, pega meu cursor!",
+            return_cursor: "↩ Devolver meu cursor",
         }
     } else {
         Labels {
@@ -128,6 +135,8 @@ fn labels(lang: &str) -> Labels {
             wallpaper: "Wallpaper",
             settings: "Settings…",
             quit: "Quit",
+            steal_cursor: "🖱 Clawd, take my pointer!",
+            return_cursor: "↩ Give my pointer back",
         }
     }
 }
@@ -154,6 +163,17 @@ fn build_menu(app: &AppHandle, cfg: &AppConfig) -> tauri::Result<Menu<Wry>> {
         &mode_item("mode-terrarium", l.terrarium, Mode::Terrarium)?,
         &mode_item("mode-wallpaper", l.wallpaper, Mode::Wallpaper)?,
         &PredefinedMenuItem::separator(app)?,
+    ])?;
+    // Only Windows lets Clawd swap the system pointer.
+    if cfg!(windows) {
+        let item = if state(app).cursors.swapped() {
+            MenuItem::with_id(app, "cursor-return", l.return_cursor, true, None::<&str>)?
+        } else {
+            MenuItem::with_id(app, "cursor-steal", l.steal_cursor, true, None::<&str>)?
+        };
+        menu.append_items(&[&item, &PredefinedMenuItem::separator(app)?])?;
+    }
+    menu.append_items(&[
         &MenuItem::with_id(app, "settings", l.settings, true, None::<&str>)?,
         &MenuItem::with_id(app, "quit", l.quit, true, None::<&str>)?,
     ])?;
@@ -226,12 +246,29 @@ fn on_menu(app: &AppHandle, event: MenuEvent) {
         "mode-wallpaper" => spawn_task(app, wallpaper_from_tray),
         "settings" => spawn_task(app, open_settings),
         "update" => open_update(app),
+        "cursor-steal" => cursor_command(app, "steal"),
+        "cursor-return" => cursor_command(app, "return"),
         "quit" => {
             remember_terrarium(app);
             state(app).update(true, |_| {});
             app.exit(0);
         }
         _ => {}
+    }
+}
+
+/// Tray / command line → the pet window plays the scene. With no visible pet to do it, the
+/// pointer is simply given back.
+fn cursor_command(app: &AppHandle, cmd: &'static str) {
+    let visible = current_pet(app)
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false);
+    if cmd == "return" && !visible {
+        let _ = state(app).cursors.restore();
+        refresh_tray(app);
+    }
+    if visible {
+        let _ = app.emit("cursor-command", cmd);
     }
 }
 
@@ -295,6 +332,8 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
     // Geometry is remembered by the callers *before* the mode changes; doing it here would
     // record the old window (e.g. the full-screen overlay) as the terrarium's size.
     if let Some(old) = current_pet(app) {
+        // Its engine (and whatever pointer scene was going on) goes away with it.
+        st.cursors.restore_if_swapped();
         old.destroy().map_err(err)?;
     }
     let label = format!("pet-{}", st.pet_seq.fetch_add(1, Ordering::Relaxed));
@@ -307,6 +346,9 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
     // gets each monitor's rect so every one has its own scene and ground.
     let wall = wallpaper_area(app, &cfg)?;
     let mut query = format!("mode={}", cfg.mode.as_str());
+    if cfg!(windows) {
+        query += "&syscursor=1";
+    }
     if cfg.mode == Mode::Wallpaper && wall.monitors.len() > 1 {
         query += &format!(
             "&segments={}",
@@ -607,6 +649,51 @@ fn open_update_page(app: AppHandle) {
     open_update(&app);
 }
 
+/// Stores one of Clawd's pointer files; the bytes come as the raw IPC body.
+#[tauri::command]
+fn cursor_store(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("expected the file as raw bytes".into());
+    };
+    let header = |name: &str| {
+        request
+            .headers()
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_string()
+    };
+    state(&app)
+        .cursors
+        .store(&header("x-cursor-kind"), &header("x-cursor-ext"), bytes)
+}
+
+#[tauri::command]
+fn cursor_hide(app: AppHandle) -> Result<(), String> {
+    let result = state(&app).cursors.hide();
+    refresh_tray(&app);
+    result
+}
+
+#[tauri::command]
+fn cursor_apply(app: AppHandle, kinds: Vec<String>) -> Result<(), String> {
+    let result = state(&app).cursors.apply(&kinds);
+    refresh_tray(&app);
+    result
+}
+
+#[tauri::command]
+fn cursor_restore(app: AppHandle) -> Result<(), String> {
+    let result = state(&app).cursors.restore();
+    refresh_tray(&app);
+    result
+}
+
+#[tauri::command]
+fn cursor_on_desktop() -> bool {
+    cursors::pointer_on_desktop()
+}
+
 #[tauri::command]
 fn get_config(app: AppHandle) -> AppConfig {
     state(&app).snapshot()
@@ -666,18 +753,24 @@ pub fn run() {
         // Opens the author's links (GitHub, LinkedIn) from the settings window; scoped in capabilities.
         .plugin(tauri_plugin_opener::init())
         // Launching again either switches mode (`--mode terrarium`) or brings up the settings.
-        .plugin(tauri_plugin_single_instance::init(
-            |app, argv, _cwd| match config::mode_from_args(&argv) {
-                Some(mode) => spawn_task(app, move |a| apply_mode(a, mode)),
-                None => spawn_task(app, open_settings),
-            },
-        ))
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if let Some(cmd) = config::cursor_from_args(&argv) {
+                cursor_command(app, cmd);
+            } else if let Some(mode) = config::mode_from_args(&argv) {
+                spawn_task(app, move |a| apply_mode(a, mode));
+            } else {
+                spawn_task(app, open_settings);
+            }
+        }))
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--autostart"]),
         ))
         .setup(|app| {
             let path = app.path().app_config_dir()?.join("config.json");
+            let cursors = cursors::Cursors::new(app.path().app_local_data_dir()?.join("cursors"));
+            // A crash (or a kill) may have left Clawd's pointers on.
+            cursors.restore_if_swapped();
             let mut cfg = AppConfig::load(&path);
             if let Some(mode) = config::mode_from_args(&std::env::args().collect::<Vec<_>>()) {
                 cfg.mode = mode;
@@ -691,6 +784,7 @@ pub fn run() {
                 pet_lock: Mutex::new(()),
                 update: Mutex::new(None),
                 force_rebuild: AtomicBool::new(false),
+                cursors,
             });
 
             let handle = app.handle().clone();
@@ -734,7 +828,12 @@ pub fn run() {
             set_check_updates,
             set_update_available,
             get_update,
-            open_update_page
+            open_update_page,
+            cursor_store,
+            cursor_hide,
+            cursor_apply,
+            cursor_restore,
+            cursor_on_desktop
         ])
         .build(tauri::generate_context!())
         .expect("error while building Clawd Pet")
@@ -744,6 +843,7 @@ pub fn run() {
                 api, code: None, ..
             } => api.prevent_exit(),
             RunEvent::Exit => {
+                state(app).cursors.restore_if_swapped();
                 remember_terrarium(app);
                 state(app).update(true, |_| {});
             }

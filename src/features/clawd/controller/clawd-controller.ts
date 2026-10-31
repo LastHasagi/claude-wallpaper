@@ -37,12 +37,17 @@ export interface ClawdApi {
   setHeldFrame(frame: number): void;
   setEyes(eyes: EyeState): void;
   lookAt(p: Point | null): void;
+  /** Drops what he knows about the pointer: no waving at it or following it (it is in his mouth). */
+  forgetPointer(): void;
   emote(text: string | null, seconds?: number): void;
   face(dir: 1 | -1): void;
   placeAt(x: number): void;
   x(): number;
   bounds(): Rect;
   bodyWidth(): number;
+  pose(): PoseName;
+  /** Where his mouth is this frame. */
+  mouth(): Point;
   /** Missions switch autonomy off while they drive Clawd. */
   setAutonomy(on: boolean): void;
   /** True while a mission drives him or his main queue has work. */
@@ -122,6 +127,11 @@ export class ClawdController implements ClawdApi {
     this.model.look = p;
   }
 
+  forgetPointer(): void {
+    this.brain.onCursor({ type: 'leave', x: -1, y: -1, t: 0 });
+    this.model.look = null;
+  }
+
   emote(text: string | null, seconds = 2): void {
     this.model.setEmote(text, seconds);
   }
@@ -146,6 +156,14 @@ export class ClawdController implements ClawdApi {
     return this.model.bodyWidth();
   }
 
+  pose(): PoseName {
+    return this.model.pose;
+  }
+
+  mouth(): Point {
+    return this.model.mouthPoint();
+  }
+
   setAutonomy(on: boolean): void {
     if (this.brain.autonomous === on) return;
     this.brain.autonomous = on;
@@ -162,6 +180,7 @@ export class ClawdController implements ClawdApi {
     this.model.elevation = 0;
     this.model.held = null;
     this.model.eyes = 'open';
+    this.model.mouth = null;
     this.model.setPose('idle');
   }
 }

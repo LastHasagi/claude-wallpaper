@@ -1,6 +1,6 @@
 [package]
 name = "clawd-pet"
-version = "0.2.1"
+version = "0.3.0"
 description = "Clawd, a desktop pet that lives in ASCII scenes"
 authors = ["Rodrigo Graça <rodrigo81graca@gmail.com>"]
 license = "PolyForm-Noncommercial-1.0.0"

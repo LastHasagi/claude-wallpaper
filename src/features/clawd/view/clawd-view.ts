@@ -3,6 +3,7 @@ import type { CanvasBackend } from '../../../shared/render/canvas-backend';
 import type { ClawdModel } from '../model/clawd-model';
 import { BODY_H, BODY_W, POSES, type PoseName } from '../sprites/body';
 import { EYES, EYES_W } from '../sprites/eyes';
+import { MOUTH_DY, MOUTHS } from '../sprites/mouth';
 import { HELD_ITEMS } from '../sprites/props';
 
 /** Poses where both hands are free to show the held item. */
@@ -33,6 +34,12 @@ export class ClawdView {
       }
       const ex = mirror(frame.eyes.x, EYES_W) + dx;
       b.drawSprite(EYES[shown], left + ex * s, top + (frame.eyes.y + dy) * s, dev, flip);
+    }
+
+    if (m.mouth) {
+      const mouth = MOUTHS[m.mouth];
+      const mx = mirror(frame.eyes.x + (EYES_W - mouth.w) / 2, mouth.w);
+      b.drawSprite(mouth, left + mx * s, top + (frame.eyes.y + MOUTH_DY) * s, dev, flip);
     }
 
     if (item && m.held) {

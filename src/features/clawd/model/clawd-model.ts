@@ -1,6 +1,7 @@
 import type { Point, Rect } from '../../../shared/geometry';
 import { BODY_H, BODY_W, POSES, type PoseName } from '../sprites/body';
-import type { EyeState } from '../sprites/eyes';
+import { EYES_W, type EyeState } from '../sprites/eyes';
+import { MOUTH_DY, type MouthState } from '../sprites/mouth';
 import type { HeldItem } from '../sprites/props';
 
 export interface Emote {
@@ -40,6 +41,7 @@ export class ClawdModel {
   pose: PoseName = 'idle';
   poseTime = 0;
   eyes: EyeState = 'open';
+  mouth: MouthState | null = null;
   look: Point | null = null;
   held: HeldItem | null = null;
   heldFrame = 0;
@@ -107,6 +109,14 @@ export class ClawdModel {
   center(): Point {
     const b = this.bounds();
     return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+  }
+
+  /** Where his mouth is (or would be) this frame, CSS px. */
+  mouthPoint(): Point {
+    const frame = POSES[this.pose].frames[this.frameIndex()]!;
+    const b = this.bounds(), s = this.stage.scale;
+    const x = frame.eyes.x + EYES_W / 2;
+    return { x: b.x + (this.facing === -1 ? BODY_W - x : x) * s, y: b.y + (frame.eyes.y + MOUTH_DY + 1) * s };
   }
 
   /** Advances animation clocks. `rand` drives the blink interval (3–6 s). */

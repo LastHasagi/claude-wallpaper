@@ -40,7 +40,7 @@ async function launch() {
   throw new Error('No system Edge/Chrome found');
 }
 
-const report = { matrix: [], click: null, soak: null, failures: [] };
+const report = { matrix: [], click: null, cursor: null, soak: null, failures: [] };
 const fail = (msg) => {
   report.failures.push(msg);
   console.error('FAIL', msg);
@@ -117,6 +117,40 @@ try {
     await page.close();
   }
 
+  // 2b. Clawd eats the pointer and spits his own (the page's CSS pointer stands in for the system's);
+  //     a click on him gives it back. Screenshots of each stage of the scene.
+  {
+    const { page, errors } = await openPage(browser, 'theme=dark&seed=3&freq=rare&notes=off&debug=1');
+    await page.waitForTimeout(800);
+    const box = await page.evaluate(() => {
+      // Toggling autonomy cancels the idle walk he may be on, so he is where we measure him.
+      window.clawd.clawd.setAutonomy(false);
+      window.clawd.clawd.setAutonomy(true);
+      return window.clawd.clawd.bounds();
+    });
+    await page.mouse.move(box.x + box.w * 1.4, box.y - box.h * 0.6);
+    await page.evaluate(() => window.clawd.cursor.command('steal'));
+    const phases = [];
+    for (const t of [700, 1500, 2600, 3600, 4300]) {
+      await page.waitForTimeout(t - (phases.at(-1)?.t ?? 0));
+      await page.screenshot({ path: `${OUT}/cursor-${t}.png` });
+      phases.push({ t, phase: await page.evaluate(() => window.clawd.cursor.model.phase) });
+    }
+    await page.waitForFunction(() => window.clawd.cursor.model.phase === 'clawd', null, { timeout: 8000 });
+    const swapped = await page.evaluate(() => document.documentElement.style.cursor);
+    await page.waitForFunction(() => !window.clawd.clawd.busy(), null, { timeout: 5000 });
+    const now = await page.evaluate(() => window.clawd.clawd.bounds());
+    await page.mouse.click(now.x + now.w / 2, now.y + now.h / 2);
+    await page.waitForFunction(() => window.clawd.cursor.model.phase === 'normal', null, { timeout: 8000 });
+    const restored = await page.evaluate(() => document.documentElement.style.cursor);
+    report.cursor = { phases, swapped: swapped.slice(0, 30), restored, errors };
+    if (!phases.some((p) => p.phase === 'stealing')) fail('cursor: never saw the stealing scene');
+    if (!swapped.startsWith('url(')) fail(`cursor: page pointer not swapped (${swapped})`);
+    if (restored !== '') fail(`cursor: page pointer not restored (${restored})`);
+    if (errors.length) fail(`cursor: console errors ${JSON.stringify(errors.slice(0, 5))}`);
+    await page.close();
+  }
+
   // 3. Soak: missions back to back with notes, 20x speed, 1080p.
   {
     const { page, errors } = await openPage(browser, 'theme=dark&freq=often&notes=always&speed=20&seed=42&debug=1', { width: 1920, height: 1080 });
@@ -164,5 +198,5 @@ try {
   server.kill();
 }
 
-console.log(JSON.stringify({ failures: report.failures, click: report.click, soak: report.soak }, null, 2));
+console.log(JSON.stringify({ failures: report.failures, click: report.click, cursor: report.cursor, soak: report.soak }, null, 2));
 process.exit(report.failures.length ? 1 : 0);

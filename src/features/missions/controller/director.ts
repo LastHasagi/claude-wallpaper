@@ -63,7 +63,10 @@ export class Director {
     }
     if (this.model.phase !== 'idle') return;
     this.model.idleLeft -= dt;
-    if (this.model.idleLeft <= 0) void this.start();
+    if (this.model.idleLeft > 0) return;
+    // Someone else is driving Clawd (e.g. he is eating the pointer): try again in a moment.
+    if (this.d.clawd.busy()) this.model.idleLeft = 5;
+    else void this.start();
   }
 
   /** Starts a mission now (a specific one, or a weighted pick). Ignored if one is running. */
@@ -118,12 +121,15 @@ export class Director {
       setHeldFrame: (f) => clawd.setHeldFrame(f),
       setEyes: (e) => clawd.setEyes(e),
       lookAt: (p) => clawd.lookAt(p),
+      forgetPointer: () => clawd.forgetPointer(),
       emote: (t, s) => clawd.emote(t, s),
       face: (dir) => clawd.face(dir),
       placeAt: (x) => clawd.placeAt(x),
       x: () => clawd.x(),
       bounds: () => clawd.bounds(),
       bodyWidth: () => clawd.bodyWidth(),
+      pose: () => clawd.pose(),
+      mouth: () => clawd.mouth(),
       setAutonomy: (on) => clawd.setAutonomy(on),
       busy: () => clawd.busy(),
       cancel: () => clawd.cancel(),

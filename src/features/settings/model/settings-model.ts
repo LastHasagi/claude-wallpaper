@@ -9,6 +9,8 @@ export interface Settings {
   fps: 15 | 30 | 60;
   missionFrequency: 'often' | 'normal' | 'rare';
   notes: 'off' | 'sometimes' | 'always';
+  /** How often Clawd steals the mouse pointer (Windows only). */
+  cursor: 'off' | 'sometimes' | 'often';
 }
 
 export interface ResolvedSettings extends Omit<Settings, 'theme' | 'language'> {
@@ -28,6 +30,7 @@ export const DEFAULTS: Readonly<Settings> = {
   fps: 30,
   missionFrequency: 'normal',
   notes: 'sometimes',
+  cursor: 'sometimes',
 };
 
 const ALLOWED: { [K in keyof Settings]: readonly Settings[K][] } = {
@@ -37,6 +40,7 @@ const ALLOWED: { [K in keyof Settings]: readonly Settings[K][] } = {
   fps: [15, 30, 60],
   missionFrequency: ['often', 'normal', 'rare'],
   notes: ['off', 'sometimes', 'always'],
+  cursor: ['off', 'sometimes', 'often'],
 };
 
 export const SETTING_KEYS = Object.keys(ALLOWED) as (keyof Settings)[];
@@ -75,6 +79,7 @@ export function overridesFromParams(params: URLSearchParams): Partial<Record<key
     fps: 'fps',
     freq: 'missionFrequency',
     notes: 'notes',
+    cursor: 'cursor',
   };
   const out: Partial<Record<keyof Settings, unknown>> = {};
   for (const [param, key] of Object.entries(map)) {

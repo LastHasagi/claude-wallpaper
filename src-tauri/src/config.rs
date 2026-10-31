@@ -69,14 +69,29 @@ pub fn segments_param(rects: &[PxRect], span: &PxRect) -> String {
 
 /// Parses `--mode <overlay|terrarium|wallpaper>` (or `--mode=<…>`) from command-line arguments.
 pub fn mode_from_args(args: &[String]) -> Option<Mode> {
-    let value = args.iter().enumerate().find_map(|(i, a)| {
-        if a == "--mode" {
+    let value = arg_value(args, "--mode")?;
+    serde_json::from_value(serde_json::Value::String(value.to_lowercase())).ok()
+}
+
+/// `--cursor steal` / `--cursor return`: asks Clawd to take the mouse pointer or give it back.
+pub fn cursor_from_args(args: &[String]) -> Option<&'static str> {
+    match arg_value(args, "--cursor")?.to_lowercase().as_str() {
+        "steal" => Some("steal"),
+        "return" => Some("return"),
+        _ => None,
+    }
+}
+
+/// Value of `--name value` or `--name=value`.
+fn arg_value(args: &[String], name: &str) -> Option<String> {
+    let prefix = format!("{name}=");
+    args.iter().enumerate().find_map(|(i, a)| {
+        if a == name {
             args.get(i + 1).cloned()
         } else {
-            a.strip_prefix("--mode=").map(str::to_string)
+            a.strip_prefix(&prefix).map(str::to_string)
         }
-    })?;
-    serde_json::from_value(serde_json::Value::String(value.to_lowercase())).ok()
+    })
 }
 
 /// A saved terrarium is reused only if it is a reasonable size and still on screen
@@ -336,6 +351,10 @@ mod tests {
         assert_eq!(mode_from_args(&args(&["app", "--mode", "nope"])), None);
         assert_eq!(mode_from_args(&args(&["app", "--autostart"])), None);
         assert_eq!(mode_from_args(&args(&["app", "--mode"])), None);
+        assert_eq!(cursor_from_args(&args(&["app", "--cursor", "steal"])), Some("steal"));
+        assert_eq!(cursor_from_args(&args(&["app", "--cursor=RETURN"])), Some("return"));
+        assert_eq!(cursor_from_args(&args(&["app", "--cursor", "eat"])), None);
+        assert_eq!(cursor_from_args(&args(&["app", "--mode", "overlay"])), None);
     }
 
     #[test]

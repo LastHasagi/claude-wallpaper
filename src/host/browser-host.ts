@@ -1,5 +1,7 @@
+import type { CursorArt } from '../shared/cursor';
 import type { Rect } from '../shared/geometry';
-import type { CursorEvent, CursorSource, DisplayMode, HostAdapter } from './host';
+import { spriteRgba } from '../shared/render/sprite';
+import type { CursorEvent, CursorSource, DisplayMode, HostAdapter, SystemCursorPort } from './host';
 import { LocalStorage } from './local-storage';
 import { parseSegments } from './segments';
 
@@ -24,6 +26,42 @@ class DomCursor implements CursorSource {
   }
 }
 
+/** Preview of the pointer swap: only this page's pointer changes (CSS), never the system's. */
+class CssCursor implements SystemCursorPort {
+  constructor(private readonly doc: Document) {}
+
+  async hide(): Promise<void> {
+    this.set('none');
+  }
+
+  async apply(art: readonly CursorArt[]): Promise<void> {
+    const arrow = art.find((a) => a.kind === 'arrow');
+    this.set(arrow ? `url(${this.png(arrow)}) ${arrow.hotspot.x * 2} ${arrow.hotspot.y * 2}, auto` : '');
+  }
+
+  async restore(): Promise<void> {
+    this.set('');
+  }
+
+  async visible(): Promise<boolean> {
+    return true;
+  }
+
+  private set(css: string): void {
+    this.doc.documentElement.style.cursor = css;
+  }
+
+  private png(art: CursorArt): string {
+    const frame = art.frames[0]!;
+    const canvas = this.doc.createElement('canvas');
+    canvas.width = frame.w * 2;
+    canvas.height = frame.h * 2;
+    const img = new ImageData(spriteRgba(frame, 2), canvas.width, canvas.height);
+    canvas.getContext('2d')?.putImageData(img, 0, 0);
+    return canvas.toDataURL('image/png');
+  }
+}
+
 /** Host for running the engine in a plain browser tab (development, E2E). */
 export class BrowserHost implements HostAdapter {
   readonly mode: DisplayMode;
@@ -33,12 +71,14 @@ export class BrowserHost implements HostAdapter {
   interactiveRects: Rect[] = [];
 
   readonly fakeDesktop: boolean;
+  readonly systemCursor: SystemCursorPort;
   private readonly segmentRects: Rect[];
 
   constructor(params: URLSearchParams, private readonly win: Window = window) {
     this.mode = params.get('mode') === 'overlay' ? 'overlay' : 'full';
     this.fakeDesktop = this.mode === 'overlay' && !params.has('transparent');
     this.cursor = new DomCursor(win);
+    this.systemCursor = new CssCursor(win.document);
     // Simulates several monitors in a browser tab, e.g. ?segments=0,0,640,450;640,90,640,360
     this.segmentRects = parseSegments(params.get('segments'));
   }

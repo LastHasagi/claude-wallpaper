@@ -32,6 +32,8 @@ interface UpdateInfo {
 
 const ALL_MONITORS = 'all';
 const inTauri = '__TAURI_INTERNALS__' in window;
+/** Only Windows lets Clawd swap the system pointer (the browser preview shows everything). */
+const canSwapPointer = !inTauri || navigator.userAgent.includes('Windows');
 const params = new URLSearchParams(location.search);
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -119,14 +121,17 @@ function renderUpdate(s: (typeof STRINGS)['pt']): void {
 }
 
 type RowKey = Exclude<keyof Settings, never>;
-const ROWS: { key: RowKey; options: readonly (string | number)[] }[] = [
+type Row = { key: RowKey; options: readonly (string | number)[] };
+const ALL_ROWS: Row[] = [
   { key: 'theme', options: ['system', 'dark', 'light'] },
   { key: 'language', options: ['system', 'pt', 'en'] },
   { key: 'size', options: ['S', 'M', 'L'] },
   { key: 'missionFrequency', options: ['often', 'normal', 'rare'] },
   { key: 'notes', options: ['off', 'sometimes', 'always'] },
+  { key: 'cursor', options: ['off', 'sometimes', 'often'] },
   { key: 'fps', options: [15, 30, 60] },
 ];
+const ROWS = ALL_ROWS.filter((r) => r.key !== 'cursor' || canSwapPointer);
 
 function applyTheme(): void {
   const c = PALETTES[settings.resolved().theme].colors;

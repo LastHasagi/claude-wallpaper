@@ -24,7 +24,7 @@ const pt = {
     wallpaper: ['Papel de parede', 'O cenário vira o fundo da área de trabalho.'],
   },
   rows: {
-    theme: 'Tema', language: 'Idioma', size: 'Tamanho', missionFrequency: 'Missões', notes: 'Curiosidades', fps: 'Animação (fps)',
+    theme: 'Tema', language: 'Idioma', size: 'Tamanho', missionFrequency: 'Missões', notes: 'Curiosidades', cursor: 'Roubar o cursor', fps: 'Animação (fps)',
     autostart: 'Iniciar com o sistema', onTop: 'Terrário sempre por cima', updates: 'Avisar sobre novas versões',
   },
   values: {
@@ -55,7 +55,7 @@ const en: typeof pt = {
     wallpaper: ['Wallpaper', 'The scene becomes your desktop background.'],
   },
   rows: {
-    theme: 'Theme', language: 'Language', size: 'Size', missionFrequency: 'Missions', notes: 'Curiosities', fps: 'Animation (fps)',
+    theme: 'Theme', language: 'Language', size: 'Size', missionFrequency: 'Missions', notes: 'Curiosities', cursor: 'Steal the pointer', fps: 'Animation (fps)',
     autostart: 'Start with the system', onTop: 'Terrarium always on top', updates: 'Tell me about new versions',
   },
   values: {

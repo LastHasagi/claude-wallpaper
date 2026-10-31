@@ -1,5 +1,6 @@
 import { POSES, type PoseName } from '../sprites/body';
 import type { EyeState } from '../sprites/eyes';
+import type { MouthState } from '../sprites/mouth';
 import type { ClawdModel } from './clawd-model';
 
 /** A unit of behaviour. `update` returns true once finished. */
@@ -152,6 +153,7 @@ export interface PlayOptions {
   duration?: number;
   loops?: number;
   eyes?: EyeState;
+  mouth?: MouthState;
   emote?: string;
 }
 
@@ -167,15 +169,18 @@ export function play(pose: PoseName, opts: PlayOptions = {}): Action {
       m.setPose(pose);
       prevEyes = m.eyes;
       if (opts.eyes) m.eyes = opts.eyes;
+      if (opts.mouth) m.mouth = opts.mouth;
       if (opts.emote) m.setEmote(opts.emote, Math.min(duration, 2.5));
     },
     resume: (m) => {
       m.setPose(pose);
       if (opts.eyes) m.eyes = opts.eyes;
+      if (opts.mouth) m.mouth = opts.mouth;
     },
     update: (_m, dt) => (elapsed += dt) >= duration,
     end: (m) => {
       if (opts.eyes) m.eyes = prevEyes;
+      if (opts.mouth) m.mouth = null;
     },
   };
 }

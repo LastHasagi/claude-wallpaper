@@ -5,6 +5,7 @@ import { CanvasBackend } from '../shared/render/canvas-backend';
 import { PALETTES } from '../shared/render/roles';
 import type { HostAdapter } from '../host/host';
 import { ClawdController, ClawdView, type ClawdEvents } from '../features/clawd';
+import { CursorController, CursorView } from '../features/cursor';
 import { Director, MISSIONS, TerminalView, missionLabel, type MissionEvents, type MissionId } from '../features/missions';
 import { FACTS, NotePicker, NotesController, NoteView, type NotesEvents } from '../features/notes';
 import { SceneController } from '../features/scene';
@@ -60,7 +61,14 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
     frequency: () => settings.get().missionFrequency,
     afterMission: (topic, signal) => notes.maybeDeliver(topic, signal),
   });
-  const views = { clawd: new ClawdView(), note: new NoteView(), terminal: new TerminalView() };
+  const cursor = new CursorController({
+    clawd,
+    port: host.systemCursor,
+    rng: rng.fork(6),
+    setting: () => settings.get().cursor,
+    lang,
+  });
+  const views = { clawd: new ClawdView(), note: new NoteView(), terminal: new TerminalView(), cursor: new CursorView() };
 
   function applyTheme(): void {
     const theme = settings.resolved().theme;
@@ -94,12 +102,15 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
 
   host.languageChanged?.(lang());
   host.onExternalSettings?.((patch) => settings.set(patch as Partial<Settings>));
+  // Tray / command line. A hidden window doesn't animate, so "give it back" just restores.
+  host.onCursorCommand?.((cmd) => (doc.hidden && cmd === 'return' ? void cursor.restoreNow() : cursor.command(cmd)));
 
   bus.on('settings:changed', ({ changed, resolved }) => {
     if (changed.includes('language')) host.languageChanged?.(resolved.lang);
     if (changed.includes('theme')) applyTheme();
     if (changed.includes('size')) layout();
     if (changed.includes('fps')) loop.fps = resolved.fps;
+    if (changed.includes('cursor')) cursor.settingChanged(resolved.cursor);
     if (changed.includes('language') && director.model.current) {
       const def = MISSIONS.find((d) => d.id === director.model.current)!;
       scene.setLabel(missionLabel(def, resolved.lang));
@@ -107,6 +118,7 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
   });
 
   host.cursor.subscribe((e) => {
+    if (cursor.onCursor(e)) return;
     if (notes.onCursor(e)) return;
     clawd.onCursor(e);
   });
@@ -120,6 +132,7 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
       const t0 = performance.now();
       director.update(dt);
       clawd.update(dt);
+      cursor.update(dt);
       scene.update(dt);
       notes.update(dt);
       stats.addUpdate(performance.now() - t0);
@@ -131,6 +144,7 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
       views.note.draw(backend, notes.model, lang());
       views.clawd.draw(backend, clawd.model);
       views.terminal.draw(backend, director.terminal, clawd.bounds());
+      views.cursor.draw(backend, cursor.model);
       const rects = [clawd.bounds(), ...notes.interactiveRects()];
       host.setInteractiveRects(rects);
       if (debug) for (const r of rects) backend.strokeRect(r.x, r.y, r.w, r.h, '#ff3b6b');
@@ -146,7 +160,8 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
           `director ${d.phase}${d.current ? ` (${d.current})` : ''}  next in ${Math.max(0, d.idleLeft).toFixed(0)}s  done ${d.completed}`,
           `clawd ${clawd.model.pose}  action ${clawd.queue.current()?.name ?? '-'}  auto ${clawd.brain.autonomous}`,
           `biome ${scene.biome()}  tod ${scene.timeOfDay()}  note ${notes.model.note?.fact.id ?? '-'}`,
-          `keys: M missão · N bilhete · T tema · L idioma`,
+          `cursor ${cursor.model.phase}${host.systemCursor ? '' : ' (unsupported)'}  resting ${cursor.model.restingFor.toFixed(1)}s`,
+          `keys: M missão · N bilhete · T tema · L idioma · C cursor`,
         ].join('\n');
       }
     },
@@ -168,6 +183,8 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
         settings.set({ theme: settings.resolved().theme === 'dark' ? 'light' : 'dark' });
       } else if (key === 'l') {
         settings.set({ language: lang() === 'pt' ? 'en' : 'pt' });
+      } else if (key === 'c') {
+        cursor.command(cursor.model.phase === 'normal' ? 'steal' : 'return');
       }
     });
   }
@@ -175,5 +192,5 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
   const forced = params.get('mission') as MissionId | null;
   if (forced && MISSIONS.some((m) => m.id === forced)) void director.start(forced);
 
-  return { bus, settings, clawd, scene, director, notes, loop, backend, seed };
+  return { bus, settings, clawd, scene, director, notes, cursor, loop, backend, seed };
 }

@@ -1,9 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { cursorPosition, getCurrentWindow } from '@tauri-apps/api/window';
+import type { CursorArt } from '../shared/cursor';
 import type { Point, Rect } from '../shared/geometry';
 import type { Lang } from '../shared/i18n';
-import type { CursorEvent, CursorSource, DisplayMode, HostAdapter } from './host';
+import { cursorFile } from './cursor-files';
+import type { CursorCommand, CursorEvent, CursorSource, DisplayMode, HostAdapter, SystemCursorPort } from './host';
 import { LocalStorage } from './local-storage';
 import { insideViewport, shouldCapture, toLocal } from './pointer';
 import { parseSegments } from './segments';
@@ -12,6 +14,37 @@ export type NativeMode = 'overlay' | 'terrarium' | 'wallpaper';
 
 const POLL_MS = 33;
 const ORIGIN_REFRESH_MS = 2000;
+
+/** Swaps the real system pointers (Windows): the files are written once, then loaded natively. */
+class NativeCursor implements SystemCursorPort {
+  private stored = false;
+
+  constructor(private readonly mode: NativeMode) {}
+
+  hide(): Promise<void> {
+    return invoke('cursor_hide');
+  }
+
+  async apply(art: readonly CursorArt[]): Promise<void> {
+    if (!this.stored) {
+      for (const a of art) {
+        const file = cursorFile(a);
+        await invoke('cursor_store', file.bytes, { headers: { 'x-cursor-kind': a.kind, 'x-cursor-ext': file.ext } });
+      }
+      this.stored = true;
+    }
+    await invoke('cursor_apply', { kinds: art.map((a) => a.kind) });
+  }
+
+  restore(): Promise<void> {
+    return invoke('cursor_restore');
+  }
+
+  async visible(): Promise<boolean> {
+    // Behind the icons he only sees the pointer when it is over the desktop, not over a window.
+    return this.mode !== 'wallpaper' || invoke<boolean>('cursor_on_desktop');
+  }
+}
 
 /**
  * Host for the desktop app. The native window is created by Rust with `?mode=<native mode>`;
@@ -26,6 +59,7 @@ export class TauriHost implements HostAdapter {
   private capturing = false;
   private lastLocal: Point | null = null;
   private lang: Lang | null = null;
+  readonly systemCursor?: SystemCursorPort;
 
   /** Monitors in physical px; converted with the *current* DPR (it can change after the window is
    *  moved behind the desktop icons, so it must not be frozen at startup). */
@@ -38,6 +72,8 @@ export class TauriHost implements HostAdapter {
     this.segmentsRaw = params.get('segments');
     this.mode = this.nativeMode === 'overlay' ? 'overlay' : 'full';
     this.cursor = { subscribe: (fn) => this.subscribe(fn) };
+    // The native side adds `syscursor=1` where it can swap the system pointer (Windows).
+    if (params.get('syscursor') === '1') this.systemCursor = new NativeCursor(this.nativeMode);
     if (this.nativeMode === 'terrarium') this.addTerrariumChrome();
   }
 
@@ -69,6 +105,10 @@ export class TauriHost implements HostAdapter {
 
   onExternalSettings(cb: (patch: Record<string, unknown>) => void): void {
     void listen<Record<string, unknown>>('settings-changed', (e) => cb(e.payload));
+  }
+
+  onCursorCommand(cb: (cmd: CursorCommand) => void): void {
+    void listen<CursorCommand>('cursor-command', (e) => cb(e.payload));
   }
 
   languageChanged(lang: Lang): void {
