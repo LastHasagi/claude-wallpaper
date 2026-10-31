@@ -1,6 +1,7 @@
 # Publishes a GitHub Release with installers for Windows, macOS and Linux.
 #
-# To release: bump "version" in src-tauri/tauri.conf.json (and package.json), commit, then
+# To release: bump "version" in src-tauri/tauri.conf.json (and package.json), add a "## vX.Y.Z"
+# section to CHANGELOG.md (it becomes the release text), commit, then
 #   git tag v0.2.0 && git push origin v0.2.0
 name: release
 
@@ -16,6 +17,8 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-22.04
+    outputs:
+      notes: ${{ steps.notes.outputs.body }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -30,6 +33,16 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME does not match app version v$version (src-tauri/tauri.conf.json)"
             exit 1
           fi
+      # The release text is this version's CHANGELOG section; fails if there is none.
+      - name: Release notes from CHANGELOG.md
+        id: notes
+        run: |
+          node scripts/release-notes.mjs "$GITHUB_REF_NAME" > notes.md
+          {
+            echo 'body<<NOTES_EOF'
+            cat notes.md
+            echo 'NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
       - run: npm run typecheck
       - run: npm test
 
@@ -73,15 +86,4 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
-          releaseBody: |
-            **Clawd Pet** ${{ github.ref_name }}: um pet de desktop que vive em cenários de ASCII art, sai em missões, traz curiosidades e reage ao mouse.
-
-            ![demo](https://raw.githubusercontent.com/${{ github.repository }}/main/docs/media/clawd-demo.gif)
-
-            ### Instalar
-            - **Windows:** baixe o `*_x64-setup.exe` (ou o `.msi`). O instalador não é assinado, então o SmartScreen pode avisar: "Mais informações" → "Executar assim mesmo".
-            - **macOS:** baixe o `.dmg` (universal). Não é assinado: na primeira vez, clique com o botão direito no app → Abrir.
-            - **Linux:** `.AppImage`, `.deb` ou `.rpm`.
-
-            Criado por **Rodrigo Graça** · [GitHub](https://github.com/LastHasagi) · [LinkedIn](https://www.linkedin.com/in/rodrigo-de-souza-graca/)
-            Licença [PolyForm Noncommercial 1.0.0](https://github.com/${{ github.repository }}/blob/main/LICENSE): uso livre não comercial, com crédito obrigatório.
+          releaseBody: ${{ needs.test.outputs.notes }}

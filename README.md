@@ -56,10 +56,11 @@ O config do app fica em `%APPDATA%\dev.clawdpet.app\config.json` (Windows). As p
 
 Releases são automáticas (`.github/workflows/release.yml`):
 
-1. Suba a `version` em `src-tauri/tauri.conf.json` e no `package.json`, e faça commit.
-2. `git tag v0.2.0 && git push origin v0.2.0`
+1. Suba a `version` em `src-tauri/tauri.conf.json` e no `package.json`.
+2. Escreva em [CHANGELOG.md](CHANGELOG.md) uma seção `## vX.Y.Z` com o que mudou. Ela vira o texto da release (`node scripts/release-notes.mjs vX.Y.Z` mostra como vai ficar).
+3. Faça commit e depois `git tag v0.2.0 && git push origin v0.2.0`.
 
-O GitHub Actions roda os testes, confere se a tag bate com a versão do app, compila Windows, macOS (universal) e Linux e publica a release com os instaladores. Em todo push e pull request, o `ci.yml` roda o typecheck e os testes.
+O GitHub Actions roda os testes, confere se a tag bate com a versão do app e se o CHANGELOG tem a seção dela, compila Windows, macOS (universal) e Linux e publica a release com os instaladores. Em todo push e pull request, o `ci.yml` roda o typecheck e os testes.
 
 **Atualizações:** o app consulta as Releases do GitHub ao abrir e a cada 6 horas. Quando sai uma versão nova, aparece um item na bandeja, um banner nas configurações e o Clawd traz um bilhete avisando. Dá para desligar em Configurações → "Avisar sobre novas versões". Nenhum outro dado é enviado.
 
