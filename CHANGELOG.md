@@ -3,6 +3,19 @@
 O que mudou em cada versão do Clawd Pet. A release de cada tag publica a seção correspondente
 (`scripts/release-notes.mjs`), e a pipeline falha se a versão não tiver entrada aqui.
 
+## v0.4.0 — 2026-10-31
+
+### Novo
+- **O Clawd come ícones da área de trabalho (Windows).** Arraste arquivos ou pastas da área de trabalho até ele: ele abre a boca, engole tudo ("nhac!") e mostra quantos comeu. Os itens somem da área de trabalho.
+- Para pegar de volta, clique nele ou use **Devolver meus ícones** na bandeja. Ele também devolve sozinho depois de 5 minutos ("arrot!") e sempre que o app fecha, troca de modo ou é desinstalado.
+
+### Segurança: nada é apagado
+- "Comer" só marca o item como **oculto**. O arquivo ou a pasta continua no mesmo lugar, com o mesmo conteúdo, e ao ser devolvido só perde a marca de oculto.
+- Ele só aceita itens que estão direto na sua área de trabalho (inclusive a do OneDrive). Recusa itens de outras pastas, itens já ocultos, itens de sistema e atalhos simbólicos, e come no máximo 20 de uma vez.
+- Antes de esconder qualquer coisa, o app anota o que vai comer. Se o app cair no meio, tudo é devolvido na próxima abertura. Na desinstalação, ele devolve tudo antes de ser removido.
+- Ao soltar, o Clawd responde ao Windows "copiar", nunca "mover", então o Explorer não remove nada do lugar original.
+- Funciona no pet solto e no terrário. No papel de parede, quem recebe o arrasto é a própria área de trabalho.
+
 ## v0.3.0 — 2026-10-31
 
 ### Novo

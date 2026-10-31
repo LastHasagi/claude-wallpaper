@@ -10,6 +10,8 @@ Criado por **Rodrigo Graça** · [GitHub](https://github.com/LastHasagi) · [Lin
 
 ![Os cursores do Clawd: seta, link, texto, ocupado, carregando e proibido, em fundo claro e escuro](docs/media/clawd-cursors.png)
 
+**Ele come ícones (Windows):** arraste arquivos ou pastas da área de trabalho até o Clawd e ele engole tudo. Nada é apagado nem movido: os itens só ficam ocultos, e ele devolve quando você clica nele, pela bandeja, depois de 5 minutos ou quando o app fecha.
+
 **Instalar:** baixe o instalador da sua plataforma em [Releases](https://github.com/LastHasagi/claude-wallpaper/releases) (Windows `.exe`/`.msi`, macOS `.dmg`, Linux `.AppImage`/`.deb`/`.rpm`). Os instaladores não são assinados. No Windows, o SmartScreen pode avisar: "Mais informações" → "Executar assim mesmo". No macOS, na primeira vez, clique com o botão direito no app → Abrir.
 
 ## Rodando
@@ -35,7 +37,7 @@ npm run e2e          # build de produção + Edge/Chrome: matriz de missões, cl
 | `speed=N` | Acelera o tempo |
 | `hour=H` | Força o horário (dia, entardecer, noite) |
 | `seed=S` | Cenários e sorteios reproduzíveis |
-| `debug=1` | Painel com FPS, tempos e estados. Teclas: **M** missão, **N** bilhete, **T** tema, **L** idioma, **C** rouba/devolve o ponteiro |
+| `debug=1` | Painel com FPS, tempos e estados. Teclas: **M** missão, **N** bilhete, **T** tema, **L** idioma, **C** rouba/devolve o ponteiro, **B** come/cospe ícones de mentira |
 
 ## App desktop (Tauri)
 
@@ -53,9 +55,11 @@ Na primeira execução aparece a tela de boas-vindas para escolher o modo. Depoi
 | **Terrário** | Janela pequena sem bordas. Arraste pela faixa do topo, onde fica a ⚙ para as configurações. Posição e tamanho são salvos. |
 | **Papel de parede** | **Windows:** anexada atrás dos ícones (técnica WorkerW, compatível com o layout do Windows 11 24H2+). Com mais de um monitor, o app pergunta onde aplicar: em um monitor ou em **todos**. Em todos, cada monitor tem o próprio cenário e o próprio chão, e o Clawd passeia de um para o outro. **macOS/Linux:** tela cheia "sempre por baixo" (alternativa, ainda não testada nesses sistemas). |
 
-Linha de comando: `clawd-pet --mode overlay|terrarium|wallpaper`. Com o app já aberto, isso só troca o modo da instância em execução. `clawd-pet --cursor steal|return` pede ao Clawd que roube o ponteiro ou o devolva.
+Linha de comando: `clawd-pet --mode overlay|terrarium|wallpaper`. Com o app já aberto, isso só troca o modo da instância em execução. `clawd-pet --cursor steal|return` pede ao Clawd que roube o ponteiro ou o devolva. `clawd-pet --restore-all` devolve tudo o que ele está segurando (ícones e ponteiro); o desinstalador usa isso antes de remover o app.
 
 **O cursor do Clawd (Windows):** os arquivos `.ani` são gerados pelo motor a partir da arte em pixel (16×16, em 32/48/64/96 px para cada escala de tela) e ficam em `%LOCALAPPDATA%\dev.clawdpet.app\cursors\`. A troca usa `SetSystemCursor`; a devolução recarrega o esquema de ponteiros do próprio usuário (`SPI_SETCURSORS`), então nada dele é sobrescrito. Um marcador lembra a troca: se o app cair, o ponteiro original volta na próxima abertura (ou no logoff). No papel de parede, ele só rouba quando o ponteiro está sobre a área de trabalho. macOS e Linux não permitem trocar o ponteiro do sistema, então lá a opção não aparece. `node scripts/cursor-sheet.mjs` desenha todos os quadros num PNG.
+
+**A barriga do Clawd (Windows):** itens soltos sobre ele passam pelo `belly.rs`. Ele só aceita o que está direto na Área de Trabalho do usuário (a pasta conhecida, que segue o OneDrive) e recusa links, itens de sistema e itens já ocultos. Comer liga só o atributo *oculto*; nada é movido, apagado ou alterado. A lista fica em `%LOCALAPPDATA%\dev.clawdpet.app\belly.json` e é gravada antes de ocultar. Tudo volta ao sair, ao abrir (depois de uma queda), ao recriar a janela, pela bandeja, depois de 5 minutos e na desinstalação (gancho NSIS em `src-tauri/windows/hooks.nsh`). Na hora de soltar, o WebView responde "copiar" ao Explorer, nunca "mover".
 
 O config do app fica em `%APPDATA%\dev.clawdpet.app\config.json` (Windows). As preferências do motor ficam no armazenamento local do WebView.
 
@@ -88,6 +92,7 @@ src/
     missions/  diretor de missões, contexto com cancelamento, terminal, catálogo das missões
     notes/     curiosidades PT/EN, sorteio sem repetição, entrega e dispensa do bilhete
     cursor/    o Clawd engole o ponteiro e cospe o dele: regras, cena, arte dos cursores
+    belly/     ícones arrastados até ele: fome, cena de comer/recusar/cuspir, digestão
     settings/  preferências validadas e persistidas
 ```
 

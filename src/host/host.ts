@@ -38,6 +38,35 @@ export interface SystemCursorPort {
   visible(): Promise<boolean>;
 }
 
+/** Files dragged over the engine window (CSS px, relative to it). */
+export interface FileDrag {
+  type: 'enter' | 'over' | 'drop' | 'leave';
+  x: number;
+  y: number;
+  /** Full paths of the dragged items ('enter' and 'drop' only). */
+  paths: readonly string[];
+}
+
+export type Refusal = 'notOnDesktop' | 'missing' | 'alreadyHidden' | 'untouchable' | 'full';
+
+export interface EatReport {
+  /** Names of the items now in his belly. */
+  eaten: string[];
+  refused: [name: string, why: Refusal][];
+  /** Items in his belly after this meal. */
+  total: number;
+}
+
+/**
+ * Desktop items dropped on Clawd (Windows). Eating only hides them; nothing is moved or deleted,
+ * and only items directly on the user's desktop are accepted.
+ */
+export interface BellyPort {
+  eat(paths: readonly string[]): Promise<EatReport>;
+  /** Gives everything back; resolves with how many items reappeared. */
+  spit(): Promise<number>;
+}
+
 /** Everything the engine needs from whoever embeds it (browser page, Tauri window, …). */
 export interface HostAdapter {
   readonly mode: DisplayMode;
@@ -63,4 +92,9 @@ export interface HostAdapter {
   /** Absent where the system pointer can't be swapped (macOS, Linux). */
   readonly systemCursor?: SystemCursorPort;
   onCursorCommand?(cb: (cmd: CursorCommand) => void): void;
+  /** Absent where dropped desktop items can't be eaten (other systems, wallpaper mode). */
+  readonly belly?: BellyPort;
+  onFileDrag?(cb: (e: FileDrag) => void): void;
+  /** Items were given back from outside the engine (tray menu). */
+  onBellySpat?(cb: (count: number) => void): void;
 }

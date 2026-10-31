@@ -1,3 +1,4 @@
+mod belly;
 mod config;
 mod cursors;
 #[cfg(windows)]
@@ -37,6 +38,8 @@ struct AppState {
     force_rebuild: AtomicBool,
     /// Clawd's mouse pointers (Windows): stored files and "swapped" marker.
     cursors: cursors::Cursors,
+    /// Desktop items he ate (hidden, never moved or deleted).
+    belly: belly::Belly,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -113,6 +116,7 @@ struct Labels {
     quit: &'static str,
     steal_cursor: &'static str,
     return_cursor: &'static str,
+    spit_icons: &'static str,
 }
 
 fn labels(lang: &str) -> Labels {
@@ -126,6 +130,7 @@ fn labels(lang: &str) -> Labels {
             quit: "Sair",
             steal_cursor: "🖱 Clawd, pega meu cursor!",
             return_cursor: "↩ Devolver meu cursor",
+            spit_icons: "↩ Devolver meus ícones",
         }
     } else {
         Labels {
@@ -137,6 +142,7 @@ fn labels(lang: &str) -> Labels {
             quit: "Quit",
             steal_cursor: "🖱 Clawd, take my pointer!",
             return_cursor: "↩ Give my pointer back",
+            spit_icons: "↩ Give my icons back",
         }
     }
 }
@@ -171,7 +177,13 @@ fn build_menu(app: &AppHandle, cfg: &AppConfig) -> tauri::Result<Menu<Wry>> {
         } else {
             MenuItem::with_id(app, "cursor-steal", l.steal_cursor, true, None::<&str>)?
         };
-        menu.append_items(&[&item, &PredefinedMenuItem::separator(app)?])?;
+        menu.append(&item)?;
+        let eaten = state(app).belly.count();
+        if eaten > 0 {
+            let text = format!("{} ({eaten})", l.spit_icons);
+            menu.append(&MenuItem::with_id(app, "belly-spit", text, true, None::<&str>)?)?;
+        }
+        menu.append(&PredefinedMenuItem::separator(app)?)?;
     }
     menu.append_items(&[
         &MenuItem::with_id(app, "settings", l.settings, true, None::<&str>)?,
@@ -248,6 +260,7 @@ fn on_menu(app: &AppHandle, event: MenuEvent) {
         "update" => open_update(app),
         "cursor-steal" => cursor_command(app, "steal"),
         "cursor-return" => cursor_command(app, "return"),
+        "belly-spit" => spit_icons(app),
         "quit" => {
             remember_terrarium(app);
             state(app).update(true, |_| {});
@@ -269,6 +282,28 @@ fn cursor_command(app: &AppHandle, cmd: &'static str) {
     }
     if visible {
         let _ = app.emit("cursor-command", cmd);
+    }
+}
+
+/// Gives back every desktop item Clawd ate, natively (works even with the pet hidden), and
+/// tells the engine so he can say "ptui!".
+fn spit_icons(app: &AppHandle) {
+    match state(app).belly.spit_all() {
+        Ok(n) => {
+            let _ = app.emit("belly-spat", n);
+        }
+        Err(e) => eprintln!("[clawd] could not give the icons back: {e}"),
+    }
+    refresh_tray(app);
+}
+
+/// Everything Clawd holds goes back to the user: desktop icons and the mouse pointer.
+fn give_everything_back(st: &AppState) {
+    st.cursors.restore_if_swapped();
+    match st.belly.spit_all() {
+        Ok(0) => {}
+        Ok(n) => eprintln!("[clawd] gave back {n} desktop item(s)"),
+        Err(e) => eprintln!("[clawd] could not give the icons back: {e}"),
     }
 }
 
@@ -332,8 +367,8 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
     // Geometry is remembered by the callers *before* the mode changes; doing it here would
     // record the old window (e.g. the full-screen overlay) as the terrarium's size.
     if let Some(old) = current_pet(app) {
-        // Its engine (and whatever pointer scene was going on) goes away with it.
-        st.cursors.restore_if_swapped();
+        // Its engine (and whatever it was holding) goes away with it.
+        give_everything_back(&st);
         old.destroy().map_err(err)?;
     }
     let label = format!("pet-{}", st.pet_seq.fetch_add(1, Ordering::Relaxed));
@@ -348,6 +383,10 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
     let mut query = format!("mode={}", cfg.mode.as_str());
     if cfg!(windows) {
         query += "&syscursor=1";
+        // Dragging icons onto him: not as wallpaper (the desktop itself takes the drop there).
+        if cfg.mode != Mode::Wallpaper {
+            query += "&belly=1";
+        }
     }
     if cfg.mode == Mode::Wallpaper && wall.monitors.len() > 1 {
         query += &format!(
@@ -689,6 +728,21 @@ fn cursor_restore(app: AppHandle) -> Result<(), String> {
     result
 }
 
+/// Items dropped on Clawd: only ones directly on the desktop get "eaten" (hidden).
+#[tauri::command]
+fn belly_eat(app: AppHandle, paths: Vec<String>) -> Result<belly::EatReport, String> {
+    let report = state(&app).belly.eat(&paths);
+    refresh_tray(&app);
+    report
+}
+
+#[tauri::command]
+fn belly_spit(app: AppHandle) -> Result<usize, String> {
+    let back = state(&app).belly.spit_all();
+    refresh_tray(&app);
+    back
+}
+
 #[tauri::command]
 fn cursor_on_desktop() -> bool {
     cursors::pointer_on_desktop()
@@ -754,7 +808,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         // Launching again either switches mode (`--mode terrarium`) or brings up the settings.
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            if let Some(cmd) = config::cursor_from_args(&argv) {
+            if argv.iter().any(|a| a == config::RESTORE_ALL) {
+                give_everything_back(&state(app));
+                refresh_tray(app);
+            } else if let Some(cmd) = config::cursor_from_args(&argv) {
                 cursor_command(app, cmd);
             } else if let Some(mode) = config::mode_from_args(&argv) {
                 spawn_task(app, move |a| apply_mode(a, mode));
@@ -768,9 +825,9 @@ pub fn run() {
         ))
         .setup(|app| {
             let path = app.path().app_config_dir()?.join("config.json");
-            let cursors = cursors::Cursors::new(app.path().app_local_data_dir()?.join("cursors"));
-            // A crash (or a kill) may have left Clawd's pointers on.
-            cursors.restore_if_swapped();
+            let data = app.path().app_local_data_dir()?;
+            let cursors = cursors::Cursors::new(data.join("cursors"));
+            let belly = belly::Belly::new(data.join("belly.json"), app.path().desktop_dir().ok());
             let mut cfg = AppConfig::load(&path);
             if let Some(mode) = config::mode_from_args(&std::env::args().collect::<Vec<_>>()) {
                 cfg.mode = mode;
@@ -785,7 +842,14 @@ pub fn run() {
                 update: Mutex::new(None),
                 force_rebuild: AtomicBool::new(false),
                 cursors,
+                belly,
             });
+            // A crash (or a kill) may have left icons eaten or Clawd's pointers on.
+            give_everything_back(&state(app.handle()));
+            // The uninstaller runs `clawd-pet --restore-all`: give everything back and leave.
+            if std::env::args().any(|a| a == config::RESTORE_ALL) {
+                std::process::exit(0);
+            }
 
             let handle = app.handle().clone();
             let menu = build_menu(&handle, &cfg)?;
@@ -833,7 +897,9 @@ pub fn run() {
             cursor_hide,
             cursor_apply,
             cursor_restore,
-            cursor_on_desktop
+            cursor_on_desktop,
+            belly_eat,
+            belly_spit
         ])
         .build(tauri::generate_context!())
         .expect("error while building Clawd Pet")
@@ -843,7 +909,7 @@ pub fn run() {
                 api, code: None, ..
             } => api.prevent_exit(),
             RunEvent::Exit => {
-                state(app).cursors.restore_if_swapped();
+                give_everything_back(&state(app));
                 remember_terrarium(app);
                 state(app).update(true, |_| {});
             }

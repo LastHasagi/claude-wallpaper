@@ -5,6 +5,7 @@ import { CanvasBackend } from '../shared/render/canvas-backend';
 import { PALETTES } from '../shared/render/roles';
 import type { HostAdapter } from '../host/host';
 import { ClawdController, ClawdView, type ClawdEvents } from '../features/clawd';
+import { BellyController, BellyView } from '../features/belly';
 import { CursorController, CursorView } from '../features/cursor';
 import { Director, MISSIONS, TerminalView, missionLabel, type MissionEvents, type MissionId } from '../features/missions';
 import { FACTS, NotePicker, NotesController, NoteView, type NotesEvents } from '../features/notes';
@@ -68,7 +69,14 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
     setting: () => settings.get().cursor,
     lang,
   });
-  const views = { clawd: new ClawdView(), note: new NoteView(), terminal: new TerminalView(), cursor: new CursorView() };
+  const belly = new BellyController({ clawd, port: host.belly, rng: rng.fork(7), lang });
+  const views = {
+    clawd: new ClawdView(),
+    note: new NoteView(),
+    terminal: new TerminalView(),
+    cursor: new CursorView(),
+    belly: new BellyView(),
+  };
 
   function applyTheme(): void {
     const theme = settings.resolved().theme;
@@ -104,6 +112,8 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
   host.onExternalSettings?.((patch) => settings.set(patch as Partial<Settings>));
   // Tray / command line. A hidden window doesn't animate, so "give it back" just restores.
   host.onCursorCommand?.((cmd) => (doc.hidden && cmd === 'return' ? void cursor.restoreNow() : cursor.command(cmd)));
+  host.onFileDrag?.((e) => belly.onDrag(e));
+  host.onBellySpat?.((n) => belly.spatElsewhere(n));
 
   bus.on('settings:changed', ({ changed, resolved }) => {
     if (changed.includes('language')) host.languageChanged?.(resolved.lang);
@@ -118,6 +128,7 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
   });
 
   host.cursor.subscribe((e) => {
+    if (belly.onCursor(e)) return;
     if (cursor.onCursor(e)) return;
     if (notes.onCursor(e)) return;
     clawd.onCursor(e);
@@ -133,6 +144,7 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
       director.update(dt);
       clawd.update(dt);
       cursor.update(dt);
+      belly.update(dt);
       scene.update(dt);
       notes.update(dt);
       stats.addUpdate(performance.now() - t0);
@@ -144,6 +156,7 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
       views.note.draw(backend, notes.model, lang());
       views.clawd.draw(backend, clawd.model);
       views.terminal.draw(backend, director.terminal, clawd.bounds());
+      views.belly.draw(backend, belly.model);
       views.cursor.draw(backend, cursor.model);
       const rects = [clawd.bounds(), ...notes.interactiveRects()];
       host.setInteractiveRects(rects);
@@ -161,7 +174,8 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
           `clawd ${clawd.model.pose}  action ${clawd.queue.current()?.name ?? '-'}  auto ${clawd.brain.autonomous}`,
           `biome ${scene.biome()}  tod ${scene.timeOfDay()}  note ${notes.model.note?.fact.id ?? '-'}`,
           `cursor ${cursor.model.phase}${host.systemCursor ? '' : ' (unsupported)'}  resting ${cursor.model.restingFor.toFixed(1)}s`,
-          `keys: M missão · N bilhete · T tema · L idioma · C cursor`,
+          `belly ${belly.model.phase}  ${belly.model.count} item(s)${host.belly ? '' : ' (unsupported)'}`,
+          `keys: M missão · N bilhete · T tema · L idioma · C cursor · B comer`,
         ].join('\n');
       }
     },
@@ -185,6 +199,10 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
         settings.set({ language: lang() === 'pt' ? 'en' : 'pt' });
       } else if (key === 'c') {
         cursor.command(cursor.model.phase === 'normal' ? 'steal' : 'return');
+      } else if (key === 'b') {
+        const c = clawd.bounds();
+        if (belly.model.count) void belly.spit();
+        else void belly.eat(['notas.txt', 'Projeto', 'foto.png'], { x: c.x + c.w * 2, y: c.y - c.h });
       }
     });
   }
@@ -192,5 +210,5 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
   const forced = params.get('mission') as MissionId | null;
   if (forced && MISSIONS.some((m) => m.id === forced)) void director.start(forced);
 
-  return { bus, settings, clawd, scene, director, notes, cursor, loop, backend, seed };
+  return { bus, settings, clawd, scene, director, notes, cursor, belly, loop, backend, seed };
 }

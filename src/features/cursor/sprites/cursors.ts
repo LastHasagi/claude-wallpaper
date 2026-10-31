@@ -1,47 +1,12 @@
 import { CURSOR_GRID as N, type CursorArt, type CursorKind } from '../../../shared/cursor';
-import { parseSprite, type Sprite } from '../../../shared/render/sprite';
+import { PixelGrid } from '../../../shared/render/pixel-grid';
+import type { Sprite } from '../../../shared/render/sprite';
 import { PALETTE } from '../../clawd/index';
 
 /** 16×16 drawing grid of palette letters. */
-class Grid {
-  private readonly px = Array.from({ length: N }, () => new Array<string>(N).fill('.'));
-
-  set(x: number, y: number, c: string): this {
-    if (x >= 0 && x < N && y >= 0 && y < N) this.px[y]![x] = c;
-    return this;
-  }
-
-  rect(x: number, y: number, w: number, h: number, c: string): this {
-    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) this.set(xx, yy, c);
-    return this;
-  }
-
-  /** Stamps a mask: '#' becomes `fill`, the leftmost '#' of each row `edge` (a lit edge). */
-  shape(rows: readonly string[], x: number, y: number, fill: string, edge = fill): this {
-    rows.forEach((row, dy) => {
-      const first = row.indexOf('#');
-      [...row].forEach((ch, dx) => {
-        if (ch === '#') this.set(x + dx, y + dy, dx === first ? edge : fill);
-      });
-    });
-    return this;
-  }
-
-  /** Dark 1-px outline around everything drawn, so the pointer shows on any background. */
-  outline(): this {
-    const filled = (x: number, y: number) => x >= 0 && x < N && y >= 0 && y < N && this.px[y]![x] !== '.';
-    const ring: [number, number][] = [];
-    for (let y = 0; y < N; y++) {
-      for (let x = 0; x < N; x++) {
-        if (!filled(x, y) && (filled(x - 1, y) || filled(x + 1, y) || filled(x, y - 1) || filled(x, y + 1))) ring.push([x, y]);
-      }
-    }
-    for (const [x, y] of ring) this.set(x, y, 'K');
-    return this;
-  }
-
-  sprite(): Sprite {
-    return parseSprite(this.px.map((r) => r.join('')), PALETTE);
+class Grid extends PixelGrid {
+  constructor() {
+    super(N, N);
   }
 }
 
@@ -68,7 +33,7 @@ type Eyes = 'open' | 'blink' | 'left' | 'up';
 type Legs = 'stand' | 'a' | 'b';
 
 /** Clawd in miniature, proportioned like the big sprite: body `w`×6, legs 1×2, eyes 1×2. */
-function clawd(g: Grid, x: number, y: number, o: { w?: number; eyes?: Eyes; legs?: Legs; arms?: 'side' | 'swingA' | 'swingB' } = {}): Grid {
+function clawd(g: PixelGrid, x: number, y: number, o: { w?: number; eyes?: Eyes; legs?: Legs; arms?: 'side' | 'swingA' | 'swingB' } = {}): PixelGrid {
   const w = o.w ?? 10;
   const eyes = o.eyes ?? 'open', legs = o.legs ?? 'stand';
   [1, 3, w - 4, w - 2].forEach((lx, i) => {
@@ -94,7 +59,7 @@ function clawd(g: Grid, x: number, y: number, o: { w?: number; eyes?: Eyes; legs
   return g;
 }
 
-const done = (g: Grid) => g.outline().sprite();
+const done = (g: PixelGrid) => g.outline().sprite(PALETTE);
 
 // --- The user's own pointer, as Clawd sees it (drawn while it flies into his mouth) ------------
 

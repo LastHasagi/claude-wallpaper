@@ -1,3 +1,4 @@
+import { flightFrame, type Flight, type FlightFrame } from '../../../shared/flight';
 import { dist, type Point } from '../../../shared/geometry';
 
 export type CursorSetting = 'off' | 'sometimes' | 'often';
@@ -22,27 +23,14 @@ export const RULES = {
 } as const;
 
 /** A pointer drawn on screen while it flies between the real pointer and Clawd's mouth. */
-export interface Flyer {
+/** The user's pointer (or his) flying into or out of his mouth. Scale 1 = real pointer size. */
+export interface Flyer extends Flight {
   art: 'system' | 'clawd';
-  from: Point;
-  /** Re-read every frame: the mouth and the real pointer move. */
-  to: () => Point;
-  t: number;
-  duration: number;
-  /** Height of the arc, CSS px (0 = straight line). */
-  arc: number;
-  /** 'in': slow start, fast end (sucked in). 'out': fast start, slow landing (spat out). */
-  ease: 'in' | 'out';
-  /** Size at the start and at the end (1 = real pointer size). */
-  scale: readonly [number, number];
   done: () => void;
 }
 
-export interface FlyerFrame {
+export interface FlyerFrame extends FlightFrame {
   art: Flyer['art'];
-  x: number;
-  y: number;
-  scale: number;
 }
 
 export class CursorModel {
@@ -88,16 +76,8 @@ export class CursorModel {
   /** Where the flying pointer is this frame. */
   flyerFrame(): FlyerFrame | null {
     const f = this.flyer;
-    if (!f) return null;
-    const k = Math.min(1, f.t / f.duration);
-    const e = f.ease === 'in' ? k * k : 1 - (1 - k) * (1 - k);
-    const to = f.to();
-    return {
-      art: f.art,
-      x: f.from.x + (to.x - f.from.x) * e,
-      y: f.from.y + (to.y - f.from.y) * e - 4 * f.arc * k * (1 - k),
-      scale: f.scale[0] + (f.scale[1] - f.scale[0]) * e,
-    };
+    const frame = f && flightFrame(f);
+    return f && frame ? { ...frame, art: f.art } : null;
   }
 }
 

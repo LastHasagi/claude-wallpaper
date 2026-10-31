@@ -121,6 +121,7 @@ export class Director {
       setHeldFrame: (f) => clawd.setHeldFrame(f),
       setEyes: (e) => clawd.setEyes(e),
       lookAt: (p) => clawd.lookAt(p),
+      setMouth: (m) => clawd.setMouth(m),
       forgetPointer: () => clawd.forgetPointer(),
       emote: (t, s) => clawd.emote(t, s),
       face: (dir) => clawd.face(dir),

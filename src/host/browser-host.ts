@@ -1,7 +1,7 @@
 import type { CursorArt } from '../shared/cursor';
 import type { Rect } from '../shared/geometry';
 import { spriteRgba } from '../shared/render/sprite';
-import type { CursorEvent, CursorSource, DisplayMode, HostAdapter, SystemCursorPort } from './host';
+import type { BellyPort, CursorEvent, CursorSource, DisplayMode, EatReport, FileDrag, HostAdapter, SystemCursorPort } from './host';
 import { LocalStorage } from './local-storage';
 import { parseSegments } from './segments';
 
@@ -62,6 +62,32 @@ class CssCursor implements SystemCursorPort {
   }
 }
 
+/** Preview of the belly: remembers names only, never touches a file. */
+class PretendBelly implements BellyPort {
+  private items: string[] = [];
+
+  async eat(paths: readonly string[]): Promise<EatReport> {
+    const report: EatReport = { eaten: [], refused: [], total: 0 };
+    for (const p of paths) {
+      // Reports names, like the native side.
+      const name = p.split(/[\\/]/).filter(Boolean).pop() ?? p;
+      if (this.items.length >= 20) report.refused.push([name, 'full']);
+      else {
+        this.items.push(name);
+        report.eaten.push(name);
+      }
+    }
+    report.total = this.items.length;
+    return report;
+  }
+
+  async spit(): Promise<number> {
+    const n = this.items.length;
+    this.items = [];
+    return n;
+  }
+}
+
 /** Host for running the engine in a plain browser tab (development, E2E). */
 export class BrowserHost implements HostAdapter {
   readonly mode: DisplayMode;
@@ -72,6 +98,7 @@ export class BrowserHost implements HostAdapter {
 
   readonly fakeDesktop: boolean;
   readonly systemCursor: SystemCursorPort;
+  readonly belly: BellyPort = new PretendBelly();
   private readonly segmentRects: Rect[];
 
   constructor(params: URLSearchParams, private readonly win: Window = window) {
@@ -85,6 +112,22 @@ export class BrowserHost implements HostAdapter {
 
   segments(): Rect[] {
     return this.segmentRects;
+  }
+
+  /** Files dragged from the system onto the page (names only: browsers hide paths). */
+  onFileDrag(cb: (e: FileDrag) => void): void {
+    const at = (type: FileDrag['type'], e: DragEvent, paths: string[] = []) => cb({ type, x: e.clientX, y: e.clientY, paths });
+    this.win.addEventListener('dragover', (e) => {
+      e.preventDefault(); // lets the page accept the drop
+      at('over', e);
+    });
+    this.win.addEventListener('dragleave', (e) => {
+      if (!e.relatedTarget) at('leave', e);
+    });
+    this.win.addEventListener('drop', (e) => {
+      e.preventDefault();
+      at('drop', e, [...(e.dataTransfer?.files ?? [])].map((f) => f.name));
+    });
   }
 
   groundInset(): number {

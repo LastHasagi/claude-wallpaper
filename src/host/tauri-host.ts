@@ -1,11 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { cursorPosition, getCurrentWindow } from '@tauri-apps/api/window';
 import type { CursorArt } from '../shared/cursor';
 import type { Point, Rect } from '../shared/geometry';
 import type { Lang } from '../shared/i18n';
 import { cursorFile } from './cursor-files';
-import type { CursorCommand, CursorEvent, CursorSource, DisplayMode, HostAdapter, SystemCursorPort } from './host';
+import type { BellyPort, CursorCommand, CursorEvent, CursorSource, DisplayMode, EatReport, FileDrag, HostAdapter, SystemCursorPort } from './host';
 import { LocalStorage } from './local-storage';
 import { insideViewport, shouldCapture, toLocal } from './pointer';
 import { parseSegments } from './segments';
@@ -46,6 +47,12 @@ class NativeCursor implements SystemCursorPort {
   }
 }
 
+/** Desktop items dropped on Clawd: the native side hides them (and only them) and un-hides them. */
+const nativeBelly: BellyPort = {
+  eat: (paths) => invoke<EatReport>('belly_eat', { paths }),
+  spit: () => invoke<number>('belly_spit'),
+};
+
 /**
  * Host for the desktop app. The native window is created by Rust with `?mode=<native mode>`;
  * overlay and wallpaper windows don't get mouse events, so the cursor is polled globally.
@@ -60,6 +67,7 @@ export class TauriHost implements HostAdapter {
   private lastLocal: Point | null = null;
   private lang: Lang | null = null;
   readonly systemCursor?: SystemCursorPort;
+  readonly belly?: BellyPort;
 
   /** Monitors in physical px; converted with the *current* DPR (it can change after the window is
    *  moved behind the desktop icons, so it must not be frozen at startup). */
@@ -74,6 +82,8 @@ export class TauriHost implements HostAdapter {
     this.cursor = { subscribe: (fn) => this.subscribe(fn) };
     // The native side adds `syscursor=1` where it can swap the system pointer (Windows).
     if (params.get('syscursor') === '1') this.systemCursor = new NativeCursor(this.nativeMode);
+    // ...and `belly=1` where dropped desktop items can be eaten (Windows, not as wallpaper).
+    if (params.get('belly') === '1') this.belly = nativeBelly;
     if (this.nativeMode === 'terrarium') this.addTerrariumChrome();
   }
 
@@ -105,6 +115,18 @@ export class TauriHost implements HostAdapter {
 
   onExternalSettings(cb: (patch: Record<string, unknown>) => void): void {
     void listen<Record<string, unknown>>('settings-changed', (e) => cb(e.payload));
+  }
+
+  onFileDrag(cb: (e: FileDrag) => void): void {
+    void getCurrentWebview().onDragDropEvent(({ payload: p }) => {
+      const dpr = this.win.devicePixelRatio || 1;
+      const pos = 'position' in p ? p.position : { x: -1, y: -1 };
+      cb({ type: p.type, x: pos.x / dpr, y: pos.y / dpr, paths: 'paths' in p ? p.paths : [] });
+    });
+  }
+
+  onBellySpat(cb: (count: number) => void): void {
+    void listen<number>('belly-spat', (e) => cb(e.payload));
   }
 
   onCursorCommand(cb: (cmd: CursorCommand) => void): void {

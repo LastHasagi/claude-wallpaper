@@ -73,6 +73,9 @@ pub fn mode_from_args(args: &[String]) -> Option<Mode> {
     serde_json::from_value(serde_json::Value::String(value.to_lowercase())).ok()
 }
 
+/// Command-line flag the uninstaller uses: give back everything Clawd holds, then quit.
+pub const RESTORE_ALL: &str = "--restore-all";
+
 /// `--cursor steal` / `--cursor return`: asks Clawd to take the mouse pointer or give it back.
 pub fn cursor_from_args(args: &[String]) -> Option<&'static str> {
     match arg_value(args, "--cursor")?.to_lowercase().as_str() {

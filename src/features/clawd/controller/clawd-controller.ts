@@ -7,6 +7,7 @@ import { ActionQueue, hopTo, jump, play, wait, walkTo, type PlayOptions } from '
 import { ClawdModel, type Stage } from '../model/clawd-model';
 import type { PoseName } from '../sprites/body';
 import type { EyeState } from '../sprites/eyes';
+import type { MouthState } from '../sprites/mouth';
 import type { HeldItem } from '../sprites/props';
 import { Brain, type ReactionKind } from './brain';
 
@@ -37,6 +38,8 @@ export interface ClawdApi {
   setHeldFrame(frame: number): void;
   setEyes(eyes: EyeState): void;
   lookAt(p: Point | null): void;
+  /** Holds his mouth open (or shut, with null) until changed again. */
+  setMouth(mouth: MouthState | null): void;
   /** Drops what he knows about the pointer: no waving at it or following it (it is in his mouth). */
   forgetPointer(): void;
   emote(text: string | null, seconds?: number): void;
@@ -125,6 +128,10 @@ export class ClawdController implements ClawdApi {
 
   lookAt(p: Point | null): void {
     this.model.look = p;
+  }
+
+  setMouth(mouth: MouthState | null): void {
+    this.model.mouth = mouth;
   }
 
   forgetPointer(): void {
