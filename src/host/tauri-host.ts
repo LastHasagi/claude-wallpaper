@@ -129,6 +129,12 @@ export class TauriHost implements HostAdapter {
     void listen<number>('belly-spat', (e) => cb(e.payload));
   }
 
+  onMusic(cb: (playing: boolean) => void): void {
+    // Events only come on changes: ask for the current state first.
+    void invoke<boolean>('get_music').then(cb).catch(() => {});
+    void listen<boolean>('music', (e) => cb(e.payload));
+  }
+
   onCursorCommand(cb: (cmd: CursorCommand) => void): void {
     void listen<CursorCommand>('cursor-command', (e) => cb(e.payload));
   }

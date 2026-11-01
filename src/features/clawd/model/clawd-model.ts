@@ -3,6 +3,7 @@ import { BODY_H, BODY_W, POSES, type PoseName } from '../sprites/body';
 import { EYES_W, type EyeState } from '../sprites/eyes';
 import { MOUTH_DY, type MouthState } from '../sprites/mouth';
 import type { HeldItem } from '../sprites/props';
+import type { Wear } from './wear';
 
 export interface Emote {
   text: string;
@@ -39,6 +40,8 @@ export class ClawdModel {
   jumpY = 0;
   facing: 1 | -1 = 1;
   pose: PoseName = 'idle';
+  /** Accessories (from the settings and the season), drawn over every pose. */
+  wear: Wear = { head: null, face: null };
   poseTime = 0;
   eyes: EyeState = 'open';
   mouth: MouthState | null = null;

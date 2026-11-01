@@ -91,6 +91,7 @@ function paintShelf(g: AsciiGrid, ctx: BiomeCtx, shelf: { x: number; y: number; 
 
 export const room: BiomeDef = {
   id: 'room',
+  indoor: true,
   spots: (ctx) => ({ desk: layout(ctx).desk }),
   paint(g, ctx) {
     const { cols, groundRow } = ctx;

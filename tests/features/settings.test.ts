@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/shared/events';
 import { DEFAULTS, overridesFromParams, SettingsController, STORAGE_KEY, type SettingsEvents } from '../../src/features/settings';
+import { validate } from '../../src/features/settings/model/settings-model';
 import { MemoryStorage } from '../helpers';
 
 const env = { systemLanguage: 'pt-BR', prefersDark: true };
@@ -56,5 +57,20 @@ describe('SettingsController', () => {
   it('reads URL overrides', () => {
     const o = overridesFromParams(new URLSearchParams('theme=light&lang=en&fps=60&freq=often'));
     expect(o).toEqual({ theme: 'light', language: 'en', fps: 60, missionFrequency: 'often' });
+  });
+});
+
+describe('dance and accessories settings', () => {
+  it('defaults to dancing sometimes and seasonal accessories', () => {
+    expect(validate({})).toMatchObject({ dance: 'sometimes', head: 'auto', face: 'auto' });
+  });
+
+  it('keeps valid picks and drops invalid ones', () => {
+    expect(validate({ dance: 'x', head: 'crown', face: 'nope' })).toMatchObject({ dance: 'sometimes', head: 'crown', face: 'auto' });
+    expect(validate({ dance: 'always', head: 'none', face: 'shades' })).toMatchObject({ dance: 'always', head: 'none', face: 'shades' });
+  });
+
+  it('reads them from the URL', () => {
+    expect(overridesFromParams(new URLSearchParams('dance=off&head=santa&face=mask'))).toMatchObject({ dance: 'off', head: 'santa', face: 'mask' });
   });
 });

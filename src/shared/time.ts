@@ -11,13 +11,14 @@ export function isSleepyHour(hour: number): boolean {
   return hour >= 23 || hour < 6;
 }
 
-/** Source of the local hour; overridable for debugging (?hour=H) and tests. */
+/** Source of the local hour and date; overridable for debugging (?hour=H) and tests. */
 export interface Clock {
   hour(): number;
+  date(): Date;
 }
 
-export const systemClock: Clock = { hour: () => new Date().getHours() };
+export const systemClock: Clock = { hour: () => new Date().getHours(), date: () => new Date() };
 
 export function fixedClock(hour: number): Clock {
-  return { hour: () => hour };
+  return { hour: () => hour, date: () => new Date() };
 }

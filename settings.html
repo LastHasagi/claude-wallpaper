@@ -50,6 +50,14 @@
       #monitors .choices button { all: unset; cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--faint); background: var(--paper); color: var(--mid); font-size: 12.5px; }
       #monitors .choices button[aria-pressed="true"] { border-color: var(--accent); color: var(--ink); }
       .small-btn:focus-visible, #monitors .choices button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      #wear { display: flex; flex-direction: column; gap: 10px; }
+      .wear-slot { display: flex; flex-direction: column; gap: 6px; }
+      .wear-slot > span { color: var(--ink); }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+      .chips button { all: unset; cursor: pointer; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--faint); background: var(--paper); color: var(--mid); font-size: 12.5px; }
+      .chips button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--bg); }
+      .chips button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      #wear-hint { margin: 8px 0 0; color: var(--mid); font-size: 11.5px; }
       [hidden] { display: none !important; }
     </style>
   </head>
@@ -67,6 +75,9 @@
     <div id="monitors" hidden><p id="monitors-q"></p><div class="choices" id="monitor-choices"></div></div>
     <h2 id="prefs-heading"></h2>
     <div id="prefs"></div>
+    <h2 id="wear-heading"></h2>
+    <div id="wear"></div>
+    <p id="wear-hint"></p>
     <footer>
       <small id="credit"></small>
       <button class="primary" id="start" hidden></button>

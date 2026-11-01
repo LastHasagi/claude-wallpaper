@@ -18,6 +18,17 @@ export const PALETTE: Readonly<Record<string, string>> = {
   V: '#6b707a', // laptop base
   Y: '#f6e7a1', // notepad paper
   R: '#8c8f99', // notepad rings
+  // Accessories
+  X: '#3b2a4f', // witch hat
+  Z: '#e0a526', // hat band
+  r: '#c8323c', // Santa hat
+  w: '#f4f4f4', // fur trim, pompom
+  g: '#f2c14e', // gold
+  j: '#3fa7d6', // jewel
+  c: '#3a6ea5', // cap
+  b: '#e8618c', // bow
+  m: '#9b4dca', // carnival mask
+  n: '#3a2418', // mustache
 };
 
 /** Mutable pixel canvas used to assemble sprites from parts; emits palette-letter rows. */

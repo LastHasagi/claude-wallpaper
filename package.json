@@ -1,6 +1,6 @@
 {
   "name": "clawd-pet",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "Clawd, um pet de desktop que vive em cenários ASCII e sai em missões.",

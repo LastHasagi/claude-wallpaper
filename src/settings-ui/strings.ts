@@ -29,12 +29,19 @@ const pt = {
     wallpaper: ['Papel de parede', 'O cenário vira o fundo da área de trabalho.'],
   },
   rows: {
-    theme: 'Tema', language: 'Idioma', size: 'Tamanho', missionFrequency: 'Missões', notes: 'Curiosidades', cursor: 'Roubar o cursor', fps: 'Animação (fps)',
+    theme: 'Tema', language: 'Idioma', size: 'Tamanho', missionFrequency: 'Missões', notes: 'Curiosidades', cursor: 'Roubar o cursor', dance: 'Dançar com música', fps: 'Animação (fps)',
     autostart: 'Iniciar com o sistema', onTop: 'Terrário sempre por cima', updates: 'Avisar sobre novas versões',
   },
   values: {
     system: 'sistema', dark: 'escuro', light: 'claro', pt: 'PT', en: 'EN', S: 'P', M: 'M', L: 'G',
     often: 'frequentes', normal: 'normal', rare: 'raras', off: 'nunca', sometimes: 'às vezes', always: 'sempre',
+  },
+  wear: 'Enfeites',
+  wearHint: 'No automático, ele se veste conforme a estação: bruxa no Halloween, gorro no Natal, máscara no Carnaval.',
+  wearSlots: { head: 'Cabeça', face: 'Rosto' },
+  wearItems: {
+    auto: 'Automático', none: 'Nenhum', witch: 'Bruxa', santa: 'Gorro de Natal', crown: 'Coroa', cap: 'Boné', bow: 'Laço',
+    shades: 'Óculos escuros', mask: 'Máscara', mustache: 'Bigode',
   },
 };
 
@@ -65,12 +72,19 @@ const en: typeof pt = {
     wallpaper: ['Wallpaper', 'The scene becomes your desktop background.'],
   },
   rows: {
-    theme: 'Theme', language: 'Language', size: 'Size', missionFrequency: 'Missions', notes: 'Curiosities', cursor: 'Steal the pointer', fps: 'Animation (fps)',
+    theme: 'Theme', language: 'Language', size: 'Size', missionFrequency: 'Missions', notes: 'Curiosities', cursor: 'Steal the pointer', dance: 'Dance to music', fps: 'Animation (fps)',
     autostart: 'Start with the system', onTop: 'Terrarium always on top', updates: 'Tell me about new versions',
   },
   values: {
     system: 'system', dark: 'dark', light: 'light', pt: 'PT', en: 'EN', S: 'S', M: 'M', L: 'L',
     often: 'often', normal: 'normal', rare: 'rare', off: 'never', sometimes: 'sometimes', always: 'always',
+  },
+  wear: 'Accessories',
+  wearHint: 'On automatic he dresses for the season: a witch hat for Halloween, a Santa hat for Christmas, a mask for Carnival.',
+  wearSlots: { head: 'Head', face: 'Face' },
+  wearItems: {
+    auto: 'Automatic', none: 'None', witch: 'Witch', santa: 'Santa hat', crown: 'Crown', cap: 'Cap', bow: 'Bow',
+    shades: 'Sunglasses', mask: 'Mask', mustache: 'Mustache',
   },
 };
 

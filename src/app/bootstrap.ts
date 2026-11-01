@@ -1,12 +1,14 @@
 import { EventBus } from '../shared/events';
 import { createRng, randomSeed } from '../shared/rng';
+import { seasonOn, seasonOverride } from '../shared/season';
 import { fixedClock, systemClock } from '../shared/time';
 import { CanvasBackend } from '../shared/render/canvas-backend';
 import { PALETTES } from '../shared/render/roles';
 import type { HostAdapter } from '../host/host';
-import { ClawdController, ClawdView, type ClawdEvents } from '../features/clawd';
+import { ClawdController, ClawdView, resolveWear, type ClawdEvents } from '../features/clawd';
 import { BellyController, BellyView } from '../features/belly';
 import { CursorController, CursorView } from '../features/cursor';
+import { DanceController } from '../features/dance';
 import { Director, MISSIONS, TerminalView, missionLabel, type MissionEvents, type MissionId } from '../features/missions';
 import { FACTS, NotePicker, NotesController, NoteView, type NotesEvents } from '../features/notes';
 import { SceneController } from '../features/scene';
@@ -37,7 +39,10 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
   backend.setOpaque(host.mode === 'full');
 
   const seeds = rng.fork(2);
-  const scene = new SceneController(clock, host.mode, () => seeds.int(1, 2 ** 30));
+  const forcedSeason = seasonOverride(params.get('season'));
+  const scene = new SceneController(clock, host.mode, () => seeds.int(1, 2 ** 30), () =>
+    forcedSeason === undefined ? seasonOn(clock.date()) : forcedSeason,
+  );
   const clawd = new ClawdController(bus, rng.fork(1), clock);
   const lang = () => settings.resolved().lang;
   const notes = new NotesController({
@@ -70,6 +75,7 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
     lang,
   });
   const belly = new BellyController({ clawd, port: host.belly, rng: rng.fork(7), lang });
+  const dance = new DanceController({ clawd, rng: rng.fork(8), setting: () => settings.get().dance });
   const views = {
     clawd: new ClawdView(),
     note: new NoteView(),
@@ -114,6 +120,7 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
   host.onCursorCommand?.((cmd) => (doc.hidden && cmd === 'return' ? void cursor.restoreNow() : cursor.command(cmd)));
   host.onFileDrag?.((e) => belly.onDrag(e));
   host.onBellySpat?.((n) => belly.spatElsewhere(n));
+  host.onMusic?.((on) => dance.music(on));
 
   bus.on('settings:changed', ({ changed, resolved }) => {
     if (changed.includes('language')) host.languageChanged?.(resolved.lang);
@@ -142,9 +149,12 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
     update: (dt) => {
       const t0 = performance.now();
       director.update(dt);
+      const s = settings.get();
+      clawd.model.wear = resolveWear(s.head, s.face, scene.season());
       clawd.update(dt);
       cursor.update(dt);
       belly.update(dt);
+      dance.update(dt);
       scene.update(dt);
       notes.update(dt);
       stats.addUpdate(performance.now() - t0);
@@ -175,7 +185,8 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
           `biome ${scene.biome()}  tod ${scene.timeOfDay()}  note ${notes.model.note?.fact.id ?? '-'}`,
           `cursor ${cursor.model.phase}${host.systemCursor ? '' : ' (unsupported)'}  resting ${cursor.model.restingFor.toFixed(1)}s`,
           `belly ${belly.model.phase}  ${belly.model.count} item(s)${host.belly ? '' : ' (unsupported)'}`,
-          `keys: M missão · N bilhete · T tema · L idioma · C cursor · B comer`,
+          `dance ${dance.model.dancing ? 'dancing' : 'no'}  music ${dance.model.music}  rest ${dance.model.restLeft.toFixed(0)}s  season ${scene.season() ?? '-'}`,
+          `keys: M missão · N bilhete · T tema · L idioma · C cursor · B comer · D música`,
         ].join('\n');
       }
     },
@@ -199,6 +210,8 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
         settings.set({ language: lang() === 'pt' ? 'en' : 'pt' });
       } else if (key === 'c') {
         cursor.command(cursor.model.phase === 'normal' ? 'steal' : 'return');
+      } else if (key === 'd') {
+        dance.music(!dance.model.music);
       } else if (key === 'b') {
         const c = clawd.bounds();
         if (belly.model.count) void belly.spit();
@@ -210,5 +223,5 @@ export function bootstrap(host: HostAdapter, params: URLSearchParams, doc: Docum
   const forced = params.get('mission') as MissionId | null;
   if (forced && MISSIONS.some((m) => m.id === forced)) void director.start(forced);
 
-  return { bus, settings, clawd, scene, director, notes, cursor, belly, loop, backend, seed };
+  return { bus, settings, clawd, scene, director, notes, cursor, belly, dance, loop, backend, seed };
 }

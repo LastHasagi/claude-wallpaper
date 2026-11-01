@@ -1,8 +1,10 @@
 import { hash2 } from '../../../shared/rng';
 import { AsciiGrid } from '../../../shared/render/ascii-grid';
+import type { Season } from '../../../shared/season';
 import type { TimeOfDay } from '../../../shared/time';
 import type { DisplayMode } from '../../../host/host';
 import { BIOMES, type BiomeCtx } from '../biomes';
+import { DECOR } from '../seasons';
 import { PROP_FADE_TIME, type BiomeKey, type EffectState, type PropState, type SceneModel } from '../model/scene-model';
 import type { Panel } from '../model/panels';
 
@@ -24,16 +26,20 @@ export function panelCtx(key: BiomeKey, panel: Panel, index: number, tod: TimeOf
 
 /** Composes the ASCII grid for a frame: backdrop (cached) + animation + props + effects + label. */
 export class SceneView {
+  /** Seasonal layer over every biome (Halloween, Natal, Carnaval), or none. */
+  season: Season | null = null;
   private cache = new Map<string, AsciiGrid>();
   private work = new AsciiGrid(1, 1);
   private panelWork: AsciiGrid[] = [];
 
   private panelBackdrop(key: BiomeKey, panel: Panel, index: number, tod: TimeOfDay): AsciiGrid {
-    const id = `p|${key.biome}|${key.seed}|${index}|${panel.cols}x${panel.rows}|${panel.groundRow - panel.row0}|${tod}`;
+    const id = `p|${key.biome}|${key.seed}|${index}|${panel.cols}x${panel.rows}|${panel.groundRow - panel.row0}|${tod}|${this.season}`;
     let g = this.cache.get(id);
     if (!g) {
       g = new AsciiGrid(panel.cols, panel.rows);
-      BIOMES[key.biome].paint(g, panelCtx(key, panel, index, tod));
+      const biome = BIOMES[key.biome], ctx = panelCtx(key, panel, index, tod);
+      biome.paint(g, ctx);
+      if (this.season) DECOR[this.season].paint(g, ctx, Object.values(biome.spots(ctx)), biome.indoor ?? false);
       this.remember(id, g);
     }
     return g;
@@ -42,7 +48,7 @@ export class SceneView {
   /** Static backdrop of every panel, pasted into one full-size grid. */
   backdrop(key: BiomeKey, geo: SceneGeometry, tod: TimeOfDay): AsciiGrid {
     const sig = geo.panels.map((p) => `${p.col0},${p.row0},${p.cols},${p.rows},${p.groundRow}`).join(';');
-    const id = `all|${key.biome}|${key.seed}|${geo.cols}x${geo.rows}|${sig}|${tod}`;
+    const id = `all|${key.biome}|${key.seed}|${geo.cols}x${geo.rows}|${sig}|${tod}|${this.season}`;
     let g = this.cache.get(id);
     if (!g) {
       g = new AsciiGrid(geo.cols, geo.rows);
@@ -68,7 +74,9 @@ export class SceneView {
           let sub = this.panelWork[i];
           if (!sub || sub.cols !== p.cols || sub.rows !== p.rows) sub = this.panelWork[i] = new AsciiGrid(p.cols, p.rows);
           sub.copyFrom(this.panelBackdrop(m.current, p, i, tod));
-          BIOMES[m.current.biome].animate(sub, panelCtx(m.current, p, i, tod), m.time);
+          const biome = BIOMES[m.current.biome], ctx = panelCtx(m.current, p, i, tod);
+          biome.animate(sub, ctx, m.time);
+          if (this.season) DECOR[this.season].animate(sub, ctx, m.time, biome.indoor ?? false);
           g.paste(sub, p.col0, p.row0);
         });
       }

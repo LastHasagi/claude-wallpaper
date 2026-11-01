@@ -12,6 +12,12 @@ Criado por **Rodrigo Graça** · [GitHub](https://github.com/LastHasagi) · [Lin
 
 **Ele come ícones (Windows):** arraste arquivos ou pastas da área de trabalho até o Clawd e ele engole tudo. Nada é apagado nem movido: os itens só ficam ocultos, e ele devolve quando você clica nele, pela bandeja, depois de 5 minutos ou quando o app fecha.
 
+**Estações:** o cenário se enfeita sozinho no Halloween (15/out–15/nov: abóboras e morcegos), no Natal (16/nov–15/jan: pinheiros, pisca-pisca e neve) e no Carnaval (16/jan até a Quarta-feira de Cinzas: bandeirinhas, serpentinas e confete).
+
+**Ele dança (Windows):** quando toca música ou vídeo (Spotify, YouTube, players), o Clawd dança. Nas configurações: nunca, às vezes ou sempre.
+
+**Enfeites:** escolha um chapéu (bruxa, gorro de Natal, coroa, boné, laço) e um enfeite de rosto (óculos escuros, máscara, bigode). No automático, ele se veste conforme a estação.
+
 **Instalar:** baixe o instalador da sua plataforma em [Releases](https://github.com/LastHasagi/claude-wallpaper/releases) (Windows `.exe`/`.msi`, macOS `.dmg`, Linux `.AppImage`/`.deb`/`.rpm`). Os instaladores não são assinados. No Windows, o SmartScreen pode avisar: "Mais informações" → "Executar assim mesmo". No macOS, na primeira vez, clique com o botão direito no app → Abrir.
 
 ## Rodando
@@ -34,10 +40,13 @@ npm run e2e          # build de produção + Edge/Chrome: matriz de missões, cl
 | `theme=dark\|light`, `lang=pt\|en`, `size=S\|M\|L`, `fps=15\|30\|60` | Sobrescrevem as configurações |
 | `freq=often\|normal\|rare`, `notes=off\|sometimes\|always` | Frequência das missões e das curiosidades |
 | `cursor=off\|sometimes\|often` | Com que frequência ele rouba o ponteiro (no navegador, só o ponteiro da página muda) |
+| `season=halloween\|natal\|carnaval\|none` | Força uma estação (decoração e enfeites automáticos) |
+| `music=1`, `dance=off\|sometimes\|always` | Finge que há música tocando; com que frequência ele dança |
+| `head=auto\|none\|witch\|santa\|crown\|cap\|bow`, `face=auto\|none\|shades\|mask\|mustache` | Enfeites |
 | `speed=N` | Acelera o tempo |
 | `hour=H` | Força o horário (dia, entardecer, noite) |
 | `seed=S` | Cenários e sorteios reproduzíveis |
-| `debug=1` | Painel com FPS, tempos e estados. Teclas: **M** missão, **N** bilhete, **T** tema, **L** idioma, **C** rouba/devolve o ponteiro, **B** come/cospe ícones de mentira |
+| `debug=1` | Painel com FPS, tempos e estados. Teclas: **M** missão, **N** bilhete, **T** tema, **L** idioma, **C** rouba/devolve o ponteiro, **B** come/cospe ícones de mentira, **D** liga/desliga a música de mentira |
 
 ## App desktop (Tauri)
 
@@ -88,11 +97,12 @@ src/
   host/       HostAdapter (o contrato com quem embute o motor), BrowserHost, TauriHost, arquivos .cur/.ani
   features/
     clawd/     personagem: sprites montados por partes, fila de ações, cérebro (reações + vida própria)
-    scene/     biomas ASCII (montanhas, parque, quarto), céu por horário, props, efeitos, transições
+    scene/     biomas ASCII (montanhas, parque, quarto), céu por horário, decoração das estações, props, efeitos, transições
     missions/  diretor de missões, contexto com cancelamento, terminal, catálogo das missões
     notes/     curiosidades PT/EN, sorteio sem repetição, entrega e dispensa do bilhete
     cursor/    o Clawd engole o ponteiro e cospe o dele: regras, cena, arte dos cursores
     belly/     ícones arrastados até ele: fome, cena de comer/recusar/cuspir, digestão
+    dance/     dança quando toca mídia: rodadas, descanso, notas
     settings/  preferências validadas e persistidas
 ```
 

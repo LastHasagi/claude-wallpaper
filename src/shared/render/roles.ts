@@ -1,4 +1,5 @@
-export const COLOR_ROLES = ['bg', 'faint', 'dim', 'mid', 'strong', 'accent', 'paper', 'ink'] as const;
+// Festive colours (seasonal decorations) go last so the older roles keep their indices.
+export const COLOR_ROLES = ['bg', 'faint', 'dim', 'mid', 'strong', 'accent', 'paper', 'ink', 'red', 'green', 'gold', 'blue'] as const;
 export type ColorRole = (typeof COLOR_ROLES)[number];
 export type ThemeName = 'dark' | 'light';
 
@@ -19,6 +20,10 @@ export const PALETTES: Record<ThemeName, Theme> = {
       accent: '#d77757',
       paper: '#26241f',
       ink: '#e6e0d3',
+      red: '#e0605a',
+      green: '#5fae6b',
+      gold: '#e6b450',
+      blue: '#5b9bd5',
     },
   },
   light: {
@@ -32,6 +37,10 @@ export const PALETTES: Record<ThemeName, Theme> = {
       accent: '#c15f3c',
       paper: '#fffdf7',
       ink: '#3d3929',
+      red: '#c0392b',
+      green: '#2e8b57',
+      gold: '#b8860b',
+      blue: '#2f6fb0',
     },
   },
 };

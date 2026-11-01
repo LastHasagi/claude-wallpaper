@@ -5,6 +5,7 @@ import { BODY_H, BODY_W, POSES, type PoseName } from '../sprites/body';
 import { EYES, EYES_W } from '../sprites/eyes';
 import { MOUTH_DY, MOUTHS } from '../sprites/mouth';
 import { HELD_ITEMS } from '../sprites/props';
+import { FACE_WEAR, HEAD_WEAR, type WearDef } from '../sprites/wear';
 
 /** Poses where both hands are free to show the held item. */
 const ITEM_POSES: ReadonlySet<PoseName> = new Set(['hold', 'read', 'type', 'carry']);
@@ -49,7 +50,18 @@ export class ClawdView {
       b.drawSprite(sprite, left + lx * s, top + (anchor.y + item.oy) * s, dev, flip);
     }
 
-    if (m.emote) this.drawEmote(b, m.emote.text, m.x, top);
+    const wear = (d: WearDef) => {
+      const lx = mirror(frame.eyes.x + d.ox, d.sprite.w);
+      b.drawSprite(d.sprite, left + lx * s, top + (frame.eyes.y + d.oy) * s, dev, flip);
+    };
+    // Binoculars and the like cover the face: the face piece waits.
+    if (m.wear.face && !item?.coversEyes) wear(FACE_WEAR[m.wear.face]);
+    const hat = m.wear.head ? HEAD_WEAR[m.wear.head] : null;
+    if (hat) wear(hat);
+
+    // Speech goes above the hat, not over it.
+    const hatRise = hat ? Math.max(0, -(frame.eyes.y + hat.oy)) * s : 0;
+    if (m.emote) this.drawEmote(b, m.emote.text, m.x, top - hatRise);
   }
 
   private drawEmote(b: CanvasBackend, text: string, cx: number, top: number): void {

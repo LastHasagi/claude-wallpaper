@@ -2,6 +2,12 @@ import type { Lang, LangSetting } from '../../../shared/i18n';
 import { resolveLang } from '../../../shared/i18n';
 import type { ThemeName } from '../../../shared/render/roles';
 
+/** Accessories Clawd can wear: one on his head, one on his face. */
+export const HEAD_ITEMS = ['witch', 'santa', 'crown', 'cap', 'bow'] as const;
+export const FACE_ITEMS = ['shades', 'mask', 'mustache'] as const;
+export type HeadItem = (typeof HEAD_ITEMS)[number];
+export type FaceItem = (typeof FACE_ITEMS)[number];
+
 export interface Settings {
   theme: 'system' | ThemeName;
   language: LangSetting;
@@ -11,6 +17,11 @@ export interface Settings {
   notes: 'off' | 'sometimes' | 'always';
   /** How often Clawd steals the mouse pointer (Windows only). */
   cursor: 'off' | 'sometimes' | 'often';
+  /** Dancing while media plays (Windows only). */
+  dance: 'off' | 'sometimes' | 'always';
+  /** 'auto' follows the season; 'none' wears nothing. */
+  head: 'auto' | 'none' | HeadItem;
+  face: 'auto' | 'none' | FaceItem;
 }
 
 export interface ResolvedSettings extends Omit<Settings, 'theme' | 'language'> {
@@ -31,6 +42,9 @@ export const DEFAULTS: Readonly<Settings> = {
   missionFrequency: 'normal',
   notes: 'sometimes',
   cursor: 'sometimes',
+  dance: 'sometimes',
+  head: 'auto',
+  face: 'auto',
 };
 
 const ALLOWED: { [K in keyof Settings]: readonly Settings[K][] } = {
@@ -41,6 +55,9 @@ const ALLOWED: { [K in keyof Settings]: readonly Settings[K][] } = {
   missionFrequency: ['often', 'normal', 'rare'],
   notes: ['off', 'sometimes', 'always'],
   cursor: ['off', 'sometimes', 'often'],
+  dance: ['off', 'sometimes', 'always'],
+  head: ['auto', 'none', ...HEAD_ITEMS],
+  face: ['auto', 'none', ...FACE_ITEMS],
 };
 
 export const SETTING_KEYS = Object.keys(ALLOWED) as (keyof Settings)[];
@@ -80,6 +97,9 @@ export function overridesFromParams(params: URLSearchParams): Partial<Record<key
     freq: 'missionFrequency',
     notes: 'notes',
     cursor: 'cursor',
+    dance: 'dance',
+    head: 'head',
+    face: 'face',
   };
   const out: Partial<Record<keyof Settings, unknown>> = {};
   for (const [param, key] of Object.entries(map)) {

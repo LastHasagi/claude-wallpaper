@@ -97,4 +97,6 @@ export interface HostAdapter {
   onFileDrag?(cb: (e: FileDrag) => void): void;
   /** Items were given back from outside the engine (tray menu). */
   onBellySpat?(cb: (count: number) => void): void;
+  /** Media playing or not (Windows "now playing"); called with the current state, then on changes. */
+  onMusic?(cb: (playing: boolean) => void): void;
 }

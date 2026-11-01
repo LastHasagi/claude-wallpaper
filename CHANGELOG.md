@@ -3,6 +3,13 @@
 O que mudou em cada versão do Clawd Pet. A release de cada tag publica a seção correspondente
 (`scripts/release-notes.mjs`), e a pipeline falha se a versão não tiver entrada aqui.
 
+## v0.6.0 — 2026-11-01
+
+### Novo
+- **Estações.** O cenário se enfeita sozinho: **Halloween** de 15/out a 15/nov (abóboras no chão e morcegos no céu), **Natal** de 16/nov a 15/jan (pinheiros, pisca-pisca colorido e neve) e **Carnaval** de 16/jan até a Quarta-feira de Cinzas (bandeirinhas, serpentinas e confete). Vale para o terrário e o papel de parede, em todos os cenários e monitores.
+- **O Clawd dança (Windows).** Quando toca música ou vídeo (Spotify, YouTube no navegador, players), ele dança com notinhas em volta. Nas configurações, **Dançar com música**: nunca, às vezes (em rodadas, com pausas) ou sempre (enquanto tocar). Ele não larga uma missão no meio para dançar.
+- **Enfeites.** Nova seção nas configurações para vestir o seu Clawd: na cabeça, chapéu de bruxa, gorro de Natal, coroa, boné ou laço; no rosto, óculos escuros, máscara de carnaval ou bigode. No **automático**, ele se veste conforme a estação. O Clawd do topo das configurações mostra como fica.
+
 ## v0.5.1 — 2026-11-01
 
 ### Corrigido

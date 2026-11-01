@@ -3,6 +3,8 @@ mod config;
 mod cursors;
 #[cfg(windows)]
 mod desktop;
+#[cfg(windows)]
+mod music;
 
 use config::{AppConfig, Geometry, Mode, PxRect};
 use std::{
@@ -36,6 +38,8 @@ struct AppState {
     update: Mutex<Option<UpdateInfo>>,
     /// An update is being downloaded / installed.
     updating: AtomicBool,
+    /// Media is playing (Windows "now playing"): Clawd dances.
+    music: AtomicBool,
     /// Set by the monitor watcher: rebuild the pet even if its signature did not change.
     force_rebuild: AtomicBool,
     /// Clawd's mouse pointers (Windows): stored files and "swapped" marker.
@@ -694,7 +698,8 @@ fn list_monitors(app: AppHandle) -> Result<Vec<MonitorInfo>, String> {
 
 /// Every few seconds, notices monitors being plugged in/out (or Duplicate ↔ Extend): tells the
 /// settings window, rebuilds the wallpaper for the new layout and asks "which monitor?" when a
-/// second one shows up and no choice was made yet. It also keeps the wallpaper below the icons.
+/// second one shows up and no choice was made yet. It also keeps the wallpaper below the icons
+/// and tells the pet window when media starts or stops playing (Clawd dances).
 fn watch_monitors(app: AppHandle) {
     std::thread::spawn(move || {
         let layout = |list: &[MonitorInfo]| {
@@ -707,6 +712,13 @@ fn watch_monitors(app: AppHandle) {
             std::thread::sleep(MONITOR_POLL);
             #[cfg(windows)]
             keep_wallpaper_in_place(&app);
+            #[cfg(windows)]
+            {
+                let now = music::playing();
+                if state(&app).music.swap(now, Ordering::Relaxed) != now {
+                    let _ = app.emit("music", now);
+                }
+            }
             let Ok(list) = monitor_list(&app) else {
                 continue;
             };
@@ -854,6 +866,12 @@ fn cursor_on_desktop() -> bool {
     cursors::pointer_on_desktop()
 }
 
+/// Whether media is playing now (the pet window asks once, then follows the `music` events).
+#[tauri::command]
+fn get_music(app: AppHandle) -> bool {
+    state(&app).music.load(Ordering::Relaxed)
+}
+
 #[tauri::command]
 fn get_config(app: AppHandle) -> AppConfig {
     state(&app).snapshot()
@@ -949,6 +967,7 @@ pub fn run() {
                 pet_lock: Mutex::new(()),
                 update: Mutex::new(None),
                 updating: AtomicBool::new(false),
+                music: AtomicBool::new(false),
                 force_rebuild: AtomicBool::new(false),
                 cursors,
                 belly,
@@ -991,6 +1010,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_config,
+            get_music,
             set_mode,
             finish_onboarding,
             set_terrarium_on_top,

@@ -1,6 +1,7 @@
 import type { Rect } from '../../../shared/geometry';
 import type { PropArt } from '../../../shared/render/prop-art';
 import type { AsciiGrid } from '../../../shared/render/ascii-grid';
+import type { Season } from '../../../shared/season';
 import { timeOfDay, type Clock, type TimeOfDay } from '../../../shared/time';
 import type { DisplayMode } from '../../../host/host';
 import { BIOMES, type BiomeId } from '../biomes';
@@ -69,8 +70,14 @@ export class SceneController implements SceneApi {
   private todCheck = 0;
   private effectSeq = 0;
 
-  constructor(private readonly clock: Clock, private readonly mode: DisplayMode, private readonly seedSource: () => number) {
+  constructor(
+    private readonly clock: Clock,
+    private readonly mode: DisplayMode,
+    private readonly seedSource: () => number,
+    private readonly seasonOf: () => Season | null = () => null,
+  ) {
     this.tod = timeOfDay(clock.hour());
+    this.view.season = seasonOf();
     this.model.current = { biome: 'mountains', seed: seedSource(), focus: 0 };
   }
 
@@ -99,7 +106,13 @@ export class SceneController implements SceneApi {
     if (this.todCheck <= 0) {
       this.todCheck = 30;
       this.tod = timeOfDay(this.clock.hour());
+      this.view.season = this.seasonOf();
     }
+  }
+
+  /** Current season (decorations and Clawd's automatic accessories), re-read every 30 s. */
+  season(): Season | null {
+    return this.view.season;
   }
 
   compose(): AsciiGrid {

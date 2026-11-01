@@ -4,8 +4,9 @@ import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { EventBus } from '../shared/events';
 import { PALETTES } from '../shared/render/roles';
 import { LocalStorage } from '../host/local-storage';
-import { portrait } from '../features/clawd';
-import { SettingsController, type Settings, type SettingsEvents } from '../features/settings';
+import { portrait, resolveWear } from '../features/clawd';
+import { FACE_ITEMS, HEAD_ITEMS, SettingsController, type Settings, type SettingsEvents } from '../features/settings';
+import { seasonOn } from '../shared/season';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { asciiBar } from '../desktop/updates';
 import { AUTHOR_LINKS, MODE_ART, STRINGS, type NativeMode } from './strings';
@@ -156,9 +157,11 @@ const ALL_ROWS: Row[] = [
   { key: 'missionFrequency', options: ['often', 'normal', 'rare'] },
   { key: 'notes', options: ['off', 'sometimes', 'always'] },
   { key: 'cursor', options: ['off', 'sometimes', 'often'] },
+  { key: 'dance', options: ['off', 'sometimes', 'always'] },
   { key: 'fps', options: [15, 30, 60] },
 ];
-const ROWS = ALL_ROWS.filter((r) => r.key !== 'cursor' || canSwapPointer);
+// Swapping the pointer and reading "now playing" are Windows-only.
+const ROWS = ALL_ROWS.filter((r) => (r.key !== 'cursor' && r.key !== 'dance') || canSwapPointer);
 
 function applyTheme(): void {
   const c = PALETTES[settings.resolved().theme].colors;
@@ -167,8 +170,10 @@ function applyTheme(): void {
   document.documentElement.lang = settings.resolved().lang === 'pt' ? 'pt-BR' : 'en';
 }
 
+/** The mascot at the top doubles as the accessories preview. */
 function drawMascot(): void {
-  const sprite = portrait();
+  const s = settings.get();
+  const sprite = portrait(resolveWear(s.head, s.face, seasonOn(new Date())));
   const scale = 3;
   const canvas = $<HTMLCanvasElement>('mascot');
   canvas.width = sprite.w * scale;
@@ -245,8 +250,35 @@ function renderCredit(text: string): void {
   $('credit').replaceChildren(...parts);
 }
 
+/** Head and face pickers: Automatic (season), None, or a piece worn all year. */
+function renderWear(s: (typeof STRINGS)['pt']): void {
+  $('wear-heading').textContent = s.wear;
+  $('wear-hint').textContent = s.wearHint;
+  const current = settings.get();
+  const slot = (key: 'head' | 'face', items: readonly string[]) => {
+    const group = document.createElement('div');
+    group.className = 'wear-slot';
+    const label = document.createElement('span');
+    label.textContent = s.wearSlots[key];
+    const chips = document.createElement('div');
+    chips.className = 'chips';
+    chips.setAttribute('role', 'group');
+    for (const v of ['auto', 'none', ...items]) {
+      const b = document.createElement('button');
+      b.textContent = s.wearItems[v as keyof typeof s.wearItems];
+      b.setAttribute('aria-pressed', String(current[key] === v));
+      b.addEventListener('click', () => changeSetting(key, v));
+      chips.append(b);
+    }
+    group.append(label, chips);
+    return group;
+  };
+  $('wear').replaceChildren(slot('head', HEAD_ITEMS), slot('face', FACE_ITEMS));
+}
+
 function render(): void {
   applyTheme();
+  drawMascot();
   const s = STRINGS[settings.resolved().lang];
   const welcome = !config.onboarded;
   $('title').textContent = welcome ? s.welcome : s.settings;
@@ -305,6 +337,7 @@ function render(): void {
   );
   renderMonitors(s);
   renderUpdate(s);
+  renderWear(s);
 }
 
 $('start').addEventListener('click', async () => {
@@ -333,5 +366,4 @@ const openNotes = () => inTauri && void invoke('open_update_page').catch(console
 $('update-notes').addEventListener('click', openNotes);
 $('update-notes').addEventListener('keydown', (e) => e.key === 'Enter' && openNotes());
 bus.on('settings:changed', render);
-drawMascot();
 render();

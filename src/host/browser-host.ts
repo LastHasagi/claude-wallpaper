@@ -100,8 +100,11 @@ export class BrowserHost implements HostAdapter {
   readonly systemCursor: SystemCursorPort;
   readonly belly: BellyPort = new PretendBelly();
   private readonly segmentRects: Rect[];
+  /** Preview: ?music=1 pretends something is playing (Clawd dances). */
+  private readonly music: boolean;
 
   constructor(params: URLSearchParams, private readonly win: Window = window) {
+    this.music = params.get('music') === '1';
     this.mode = params.get('mode') === 'overlay' ? 'overlay' : 'full';
     this.fakeDesktop = this.mode === 'overlay' && !params.has('transparent');
     this.cursor = new DomCursor(win);
@@ -112,6 +115,10 @@ export class BrowserHost implements HostAdapter {
 
   segments(): Rect[] {
     return this.segmentRects;
+  }
+
+  onMusic(cb: (playing: boolean) => void): void {
+    cb(this.music);
   }
 
   /** Files dragged from the system onto the page (names only: browsers hide paths). */

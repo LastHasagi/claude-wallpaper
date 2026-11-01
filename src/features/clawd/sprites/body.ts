@@ -10,7 +10,7 @@ export const FEET: Point = { x: BODY_W / 2, y: BODY_H };
 export type PoseName =
   | 'idle' | 'walk' | 'run' | 'sit' | 'sleep' | 'jump' | 'laugh' | 'dizzy'
   | 'startle' | 'wave' | 'angry' | 'hold' | 'read' | 'type' | 'carry'
-  | 'inhale' | 'chew' | 'gulp' | 'spit';
+  | 'inhale' | 'chew' | 'gulp' | 'spit' | 'dance';
 
 export interface PoseFrame {
   sprite: Sprite;
@@ -103,4 +103,14 @@ export const POSES: Record<PoseName, Pose> = {
   chew: { fps: 7, frames: [stand({ armL: 'midLow', armR: 'midLow', squash: 1 }), stand({ armL: 'midLow', armR: 'midLow' })] },
   gulp: { fps: 1, frames: [stand({ legs: 'tuck', squash: 3 })] },
   spit: { fps: 1, frames: [stand({ armL: 'down', armR: 'down', squash: -2 })] },
+  // Sways side to side, one arm up then the other, stepping in time.
+  dance: {
+    fps: 4,
+    frames: [
+      stand({ armL: 'up', armR: 'mid', legs: 'stepA', dx: -1 }),
+      stand({ armL: 'midLow', armR: 'midLow', legs: 'stand', squash: 1 }),
+      stand({ armL: 'mid', armR: 'up', legs: 'stepB', dx: 1 }),
+      stand({ armL: 'midLow', armR: 'midLow', legs: 'stand', squash: 1 }),
+    ],
+  },
 };

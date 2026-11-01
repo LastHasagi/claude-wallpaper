@@ -1,6 +1,6 @@
 [package]
 name = "clawd-pet"
-version = "0.5.1"
+version = "0.6.0"
 description = "Clawd, a desktop pet that lives in ASCII scenes"
 authors = ["Rodrigo Graça <rodrigo81graca@gmail.com>"]
 license = "PolyForm-Noncommercial-1.0.0"
@@ -27,6 +27,8 @@ serde_json = "1"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+# WinRT "now playing" (Clawd dances); same version Tauri already pulls in.
+windows = { version = "=0.62.2", features = ["Foundation", "Foundation_Collections", "Media_Control"] }
 
 [profile.release]
 codegen-units = 1
