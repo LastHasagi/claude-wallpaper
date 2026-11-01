@@ -3,6 +3,12 @@
 O que mudou em cada versão do Clawd Pet. A release de cada tag publica a seção correspondente
 (`scripts/release-notes.mjs`), e a pipeline falha se a versão não tiver entrada aqui.
 
+## v0.5.1 — 2026-11-01
+
+### Corrigido
+- **Papel de parede sumindo e levando os ícones junto.** Com a apresentação de slides do Windows ligada, a cada troca de imagem o cenário sumia atrás da foto do Windows; e depois de Win+D (ou de esconder e mostrar o Clawd pela bandeja) o cenário voltava por cima dos ícones da área de trabalho, que pareciam ter sumido. Agora o cenário fica sempre logo abaixo dos ícones, e o app o recoloca no lugar em poucos segundos se o Windows mexer nas camadas.
+- **Comer arquivos no pet solto.** Arrastar itens da área de trabalho até o Clawd não fazia nada nesse modo: o Windows não entregava o arrasto à janela dele. Agora ele come normalmente, como no terrário.
+
 ## v0.5.0 — 2026-10-31
 
 ### Novo

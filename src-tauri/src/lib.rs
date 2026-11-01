@@ -370,7 +370,7 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
     if let (false, Some(win), Some(sig)) = (forced, current_pet(app), built) {
         if sig == pet_signature(&cfg) {
             if !cfg.hidden {
-                win.show().map_err(err)?;
+                show_pet(&win, cfg.mode)?;
             }
             return Ok(());
         }
@@ -424,6 +424,10 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
                     .resizable(false)
                     .focused(false)
                     .visible_on_all_workspaces(true)
+                    // Created visible: WebView2 never registers its drop target in a window that
+                    // starts hidden, so desktop items dropped on Clawd went nowhere (tauri#14643).
+                    // It is transparent and still empty here, so nothing flashes.
+                    .visible(true)
                     .position(wa.position.x as f64 / scale, wa.position.y as f64 / scale)
                     .inner_size(wa.size.width as f64 / scale, wa.size.height as f64 / scale)
                     .build()
@@ -497,17 +501,43 @@ fn build_pet(app: &AppHandle) -> Result<(), String> {
         }
         Mode::Terrarium => {}
     }
-    if !cfg.hidden {
-        win.show().map_err(err)?;
-        #[cfg(windows)]
-        if cfg.mode == Mode::Wallpaper {
-            desktop::restack_below_icons(
-                win.hwnd().map_err(err)?.0 as windows_sys::Win32::Foundation::HWND,
-            );
-        }
+    if cfg.hidden {
+        win.hide().map_err(err)?; // the overlay is created visible (see above)
+    } else {
+        show_pet(&win, cfg.mode)?;
     }
     eprintln!("[clawd] pet window ready");
     Ok(())
+}
+
+/// Shows the pet window; as wallpaper it then goes back below the icons (showing raises it).
+fn show_pet(win: &WebviewWindow, mode: Mode) -> Result<(), String> {
+    win.show().map_err(err)?;
+    #[cfg(not(windows))]
+    let _ = mode;
+    #[cfg(windows)]
+    if mode == Mode::Wallpaper {
+        desktop::keep_below_icons(win.hwnd().map_err(err)?.0 as windows_sys::Win32::Foundation::HWND);
+    }
+    Ok(())
+}
+
+/// Wallpaper: Windows keeps shuffling the desktop layers (slideshow, Win+D); put Clawd back.
+#[cfg(windows)]
+fn keep_wallpaper_in_place(app: &AppHandle) {
+    let st = state(app);
+    // A rebuild in progress owns the window; it restacks it itself.
+    let Ok(_serial) = st.pet_lock.try_lock() else {
+        return;
+    };
+    if st.snapshot().mode != Mode::Wallpaper {
+        return;
+    }
+    if let Some(hwnd) = current_pet(app).and_then(|w| w.hwnd().ok()) {
+        if desktop::keep_below_icons(hwnd.0 as windows_sys::Win32::Foundation::HWND) {
+            eprintln!("[clawd] wallpaper was out of place; put back below the icons");
+        }
+    }
 }
 
 fn apply_mode(app: &AppHandle, mode: Mode) -> Result<(), String> {
@@ -527,7 +557,7 @@ fn toggle_pet(app: &AppHandle) -> Result<(), String> {
     state(app).update(true, |c| c.hidden = visible);
     match current_pet(app) {
         Some(w) if visible => w.hide().map_err(err),
-        Some(w) => w.show().map_err(err),
+        Some(w) => show_pet(&w, state(app).snapshot().mode),
         None => open_pet(app),
     }
 }
@@ -664,7 +694,7 @@ fn list_monitors(app: AppHandle) -> Result<Vec<MonitorInfo>, String> {
 
 /// Every few seconds, notices monitors being plugged in/out (or Duplicate ↔ Extend): tells the
 /// settings window, rebuilds the wallpaper for the new layout and asks "which monitor?" when a
-/// second one shows up and no choice was made yet.
+/// second one shows up and no choice was made yet. It also keeps the wallpaper below the icons.
 fn watch_monitors(app: AppHandle) {
     std::thread::spawn(move || {
         let layout = |list: &[MonitorInfo]| {
@@ -675,6 +705,8 @@ fn watch_monitors(app: AppHandle) {
         let mut last = monitor_list(&app).map(|l| layout(&l)).unwrap_or_default();
         loop {
             std::thread::sleep(MONITOR_POLL);
+            #[cfg(windows)]
+            keep_wallpaper_in_place(&app);
             let Ok(list) = monitor_list(&app) else {
                 continue;
             };

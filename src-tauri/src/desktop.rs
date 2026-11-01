@@ -3,10 +3,10 @@
 use std::ptr::{null, null_mut};
 use windows_sys::Win32::Foundation::{HWND, LPARAM};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, FindWindowExW, FindWindowW, GetSystemMetrics, GetWindowLongPtrW,
-    SendMessageTimeoutW, SetParent, SetWindowLongPtrW, SetWindowPos, GWL_STYLE, SMTO_NORMAL,
-    SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
-    WS_CHILD, WS_POPUP,
+    EnumWindows, FindWindowExW, FindWindowW, GetSystemMetrics, GetWindow, GetWindowLongPtrW,
+    SendMessageTimeoutW, SetParent, SetWindowLongPtrW, SetWindowPos, GWL_STYLE, GW_HWNDNEXT,
+    SMTO_NORMAL, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SWP_FRAMECHANGED, SWP_NOACTIVATE,
+    SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_CHILD, WS_POPUP,
 };
 
 /// Undocumented Progman message that makes Explorer create the WorkerW wallpaper layer.
@@ -104,26 +104,46 @@ pub fn attach_behind_icons(
     }
 }
 
-/// Puts `hwnd` back right below the icons layer (showing a window raises it among its siblings).
-pub fn restack_below_icons(hwnd: HWND) {
+/// Keeps `hwnd` where it belongs: a child window right below the icons layer. Windows keeps
+/// disturbing that: the wallpaper slideshow puts a fresh WorkerW above it (the scene vanishes),
+/// and hiding/showing it (Win+D twice, the tray) raises it above the icons (they vanish), which it
+/// can only do because showing the window drops WS_CHILD. Cheap when nothing is off; returns
+/// whether it had to fix something.
+pub fn keep_below_icons(hwnd: HWND) -> bool {
     let progman_class = wide("Progman");
     let defview_class = wide("SHELLDLL_DefView");
-    let worker_class = wide("WorkerW");
-    let flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE;
     unsafe {
         let progman = FindWindowW(progman_class.as_ptr(), null());
         if progman.is_null() {
-            return;
+            return false;
         }
         let defview = FindWindowExW(progman, null_mut(), defview_class.as_ptr(), null());
         if defview.is_null() {
-            return; // classic layout: our parent WorkerW is already below the icons
+            return false; // classic layout: our parent WorkerW is already below the icons
         }
-        SetWindowPos(hwnd, defview, 0, 0, 0, 0, flags);
-        let worker = FindWindowExW(progman, null_mut(), worker_class.as_ptr(), null());
-        if !worker.is_null() {
-            SetWindowPos(worker, hwnd, 0, 0, 0, 0, flags);
+        let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+        let child = (style & WS_CHILD as isize) != 0;
+        if !child {
+            SetWindowLongPtrW(
+                hwnd,
+                GWL_STYLE,
+                (style & !(WS_POPUP as isize)) | WS_CHILD as isize,
+            );
         }
+        // Right after the icons in z-order, so above every WorkerW (old or freshly made).
+        if child && GetWindow(defview, GW_HWNDNEXT) == hwnd {
+            return false;
+        }
+        SetWindowPos(
+            hwnd,
+            defview,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+        );
+        true
     }
 }
 
